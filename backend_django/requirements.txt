@@ -1,0 +1,12 @@
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.0
+cryptography==41.0.7
+PyJWT==2.8.0
+google-auth==2.25.2
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+hdfs==2.7.3
+python-dotenv==1.0.0
+gunicorn==21.2.0
+whitenoise==6.6.0
