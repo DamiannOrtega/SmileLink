@@ -18,6 +18,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
 
 @Composable
 fun LoginScreen(
@@ -151,13 +154,39 @@ fun LoginScreen(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            // Future: Google Sign-In button
+            // Google Sign-In button
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val googleSignInClient = remember {
+                val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                    .requestIdToken("1017900179196-cn3n9691g2o64iifbii476t82s8h72ca.apps.googleusercontent.com")
+                    .requestEmail()
+                    .build()
+                GoogleSignIn.getClient(context, gso)
+            }
+
+            val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                try {
+                    val account = task.getResult(ApiException::class.java)
+                    val idToken = account.idToken
+                    if (idToken != null) {
+                        viewModel.googleLogin(idToken)
+                    } else {
+                        android.widget.Toast.makeText(context, "Error: idToken es nulo", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: ApiException) {
+                    android.widget.Toast.makeText(context, "Google Sign-In falló: ${e.statusCode}", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+
             OutlinedButton(
-                onClick = { /* TODO: Google Sign-In */ },
+                onClick = { launcher.launch(googleSignInClient.signInIntent) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = false
+                shape = MaterialTheme.shapes.medium
             ) {
-                Text("Continuar con Google (Próximamente)")
+                Text("Continuar con Google")
             }
         }
     }

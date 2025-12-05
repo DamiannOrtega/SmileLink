@@ -140,4 +140,27 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun resetState() {
         _uiState.value = AuthUiState.Idle
     }
+    
+    /**
+     * Login with Google
+     */
+    fun googleLogin(token: String) {
+        _uiState.value = AuthUiState.Loading
+        
+        viewModelScope.launch {
+            try {
+                val response = api.googleLogin(mapOf("token" to token))
+                
+                if (response.isSuccessful && response.body() != null) {
+                    val authResponse = response.body()!!
+                    sessionManager.saveSession(authResponse.padrino)
+                    _uiState.value = AuthUiState.Success(authResponse.padrino)
+                } else {
+                    _uiState.value = AuthUiState.Error("Error en login con Google")
+                }
+            } catch (e: Exception) {
+                _uiState.value = AuthUiState.Error("Error de conexión: ${e.message}")
+            }
+        }
+    }
 }

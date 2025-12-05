@@ -87,4 +87,7 @@ interface SmileLinkApiService {
     
     @GET("auth/me/")
     suspend fun getCurrentUser(@Query("padrino_id") padrinoId: String): Response<Padrino>
+    
+    @POST("auth/google/")
+    suspend fun googleLogin(@Body body: Map<String, String>): Response<AuthResponse>
 }
