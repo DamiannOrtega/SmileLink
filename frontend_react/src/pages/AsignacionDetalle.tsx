@@ -15,13 +15,7 @@ import {
 } from "@/services/api";
 import { Pencil, ArrowLeft, User, Heart, Calendar, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { GoogleMap, Marker, useLoadScript } from "@react-google-maps/api";
-
-const mapContainerStyle = {
-  width: "100%",
-  height: "300px",
-  borderRadius: "0.5rem",
-};
+import LeafletMapComponent from "@/components/LeafletMapComponent";
 
 export default function AsignacionDetalle() {
   const { id } = useParams();
@@ -31,10 +25,6 @@ export default function AsignacionDetalle() {
   const [asignacion, setAsignacion] = useState<Apadrinamiento | null>(null);
   const [nino, setNino] = useState<Nino | null>(null);
   const [padrino, setPadrino] = useState<Padrino | null>(null);
-
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: "AIzaSyBiJF9_m9VuwovcpOLUDBblpiOTg_DvS5E", // REPLACE WITH REAL KEY
-  });
 
   useEffect(() => {
     if (id) {
@@ -224,19 +214,17 @@ export default function AsignacionDetalle() {
             </div>
           )}
 
-          {isLoaded && asignacion.ubicacion_entrega_lat && asignacion.ubicacion_entrega_lng ? (
-            <div className="border rounded-md overflow-hidden">
-              <GoogleMap
-                mapContainerStyle={mapContainerStyle}
-                center={mapCenter}
-                zoom={15}
-              >
-                <Marker position={mapCenter} />
-              </GoogleMap>
-            </div>
+          {asignacion.ubicacion_entrega_lat && asignacion.ubicacion_entrega_lng ? (
+            <LeafletMapComponent
+              center={mapCenter}
+              zoom={15}
+              height="300px"
+              selectedLocation={mapCenter}
+              interactive={false}
+            />
           ) : (
             <div className="p-4 bg-muted/50 rounded-md text-center text-muted-foreground">
-              {isLoaded ? "No hay ubicación de mapa registrada." : "Cargando mapa..."}
+              No hay ubicación de mapa registrada.
             </div>
           )}
         </CardContent>

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PuntosEntregaService, PuntoEntrega } from "@/services/api";
-import GoogleMapComponent from "@/components/GoogleMapComponent";
+import LeafletMapComponent from "@/components/LeafletMapComponent";
 import { toast } from "sonner";
 
 export default function UbicacionDetalle() {
@@ -127,12 +127,12 @@ export default function UbicacionDetalle() {
                 </p>
               </div>
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${ubicacion.latitud},${ubicacion.longitud}`}
+                href={`https://www.openstreetmap.org/?mlat=${ubicacion.latitud}&mlon=${ubicacion.longitud}#map=15/${ubicacion.latitud}/${ubicacion.longitud}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
               >
-                Ver en Google Maps
+                Ver en OpenStreetMap
                 <ExternalLink className="h-3 w-3" />
               </a>
             </CardContent>
@@ -155,10 +155,12 @@ export default function UbicacionDetalle() {
         </div>
 
         <div>
-          <GoogleMapComponent
-            lat={ubicacion.latitud}
-            lng={ubicacion.longitud}
-            title={ubicacion.nombre_punto}
+          <LeafletMapComponent
+            center={{ lat: ubicacion.latitud, lng: ubicacion.longitud }}
+            selectedLocation={{ lat: ubicacion.latitud, lng: ubicacion.longitud }}
+            zoom={15}
+            height="500px"
+            interactive={false}
           />
         </div>
       </div>

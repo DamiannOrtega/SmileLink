@@ -22,14 +22,9 @@ import {
   Nino,
   Padrino
 } from "@/services/api";
-import { GoogleMap, Marker, useLoadScript } from "@react-google-maps/api";
+import LeafletMapComponent from "@/components/LeafletMapComponent";
 
-const containerStyle = {
-  width: "100%",
-  height: "400px",
-};
-
-const center = {
+const defaultCenter = {
   lat: 21.8853, // Aguascalientes, Mexico default
   lng: -102.2916,
 };
@@ -50,10 +45,6 @@ export default function AsignacionNueva() {
   });
 
   const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
-
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: "AIzaSyBiJF9_m9VuwovcpOLUDBblpiOTg_DvS5E", // REPLACE THIS WITH YOUR REAL API KEY
-  });
 
   useEffect(() => {
     loadData();
@@ -211,29 +202,14 @@ export default function AsignacionNueva() {
 
             <div className="space-y-2">
               <Label>Ubicación de Entrega (Opcional)</Label>
-              {isLoaded ? (
-                <div className="border rounded-md overflow-hidden">
-                  <GoogleMap
-                    mapContainerStyle={containerStyle}
-                    center={center}
-                    zoom={13}
-                    onClick={(e) => {
-                      if (e.latLng) {
-                        const lat = e.latLng.lat();
-                        const lng = e.latLng.lng();
-                        setSelectedLocation({ lat, lng });
-                        // Simple suggestion: Could optionally reverse geocode here if API enabled
-                      }
-                    }}
-                  >
-                    {selectedLocation && <Marker position={selectedLocation} />}
-                  </GoogleMap>
-                </div>
-              ) : (
-                <div className="h-[400px] bg-muted animate-pulse rounded-md flex items-center justify-center text-muted-foreground">
-                  Cargando Mapa...
-                </div>
-              )}
+              <LeafletMapComponent
+                center={defaultCenter}
+                zoom={13}
+                height="400px"
+                selectedLocation={selectedLocation}
+                onLocationSelect={setSelectedLocation}
+                interactive={true}
+              />
               <div className="pt-2">
                 <Label htmlFor="direccion_entrega">Dirección Escrita</Label>
                 <Input
