@@ -22,6 +22,18 @@ import {
   Nino,
   Padrino
 } from "@/services/api";
+import { GoogleMap, Marker, useLoadScript } from "@react-google-maps/api";
+
+const containerStyle = {
+  width: "100%",
+  height: "400px",
+};
+
+const center = {
+  lat: 21.8853, // Aguascalientes, Mexico default
+  lng: -102.2916,
+};
+
 
 export default function AsignacionNueva() {
   const navigate = useNavigate();
@@ -34,6 +46,13 @@ export default function AsignacionNueva() {
     id_nino: "",
     id_padrino: "",
     tipo_apadrinamiento: "" as "Aleatorio" | "Elección Padrino" | "",
+    direccion_entrega: "",
+  });
+
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: "AIzaSyBiJF9_m9VuwovcpOLUDBblpiOTg_DvS5E", // REPLACE THIS WITH YOUR REAL API KEY
   });
 
   useEffect(() => {
@@ -85,6 +104,9 @@ export default function AsignacionNueva() {
         tipo_apadrinamiento: formData.tipo_apadrinamiento,
         estado_apadrinamiento_registro: "Activo",
         entregas_ids: [],
+        ubicacion_entrega_lat: selectedLocation?.lat,
+        ubicacion_entrega_lng: selectedLocation?.lng,
+        direccion_entrega: formData.direccion_entrega,
       });
 
       // Actualizar estado del niño
@@ -186,6 +208,46 @@ export default function AsignacionNueva() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label>Ubicación de Entrega (Opcional)</Label>
+              {isLoaded ? (
+                <div className="border rounded-md overflow-hidden">
+                  <GoogleMap
+                    mapContainerStyle={containerStyle}
+                    center={center}
+                    zoom={13}
+                    onClick={(e) => {
+                      if (e.latLng) {
+                        const lat = e.latLng.lat();
+                        const lng = e.latLng.lng();
+                        setSelectedLocation({ lat, lng });
+                        // Simple suggestion: Could optionally reverse geocode here if API enabled
+                      }
+                    }}
+                  >
+                    {selectedLocation && <Marker position={selectedLocation} />}
+                  </GoogleMap>
+                </div>
+              ) : (
+                <div className="h-[400px] bg-muted animate-pulse rounded-md flex items-center justify-center text-muted-foreground">
+                  Cargando Mapa...
+                </div>
+              )}
+              <div className="pt-2">
+                <Label htmlFor="direccion_entrega">Dirección Escrita</Label>
+                <Input
+                  id="direccion_entrega"
+                  placeholder="Ej. Parque Central, o detalles adicionales"
+                  value={formData.direccion_entrega}
+                  onChange={(e) => setFormData(prev => ({ ...prev, direccion_entrega: e.target.value }))}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Selecciona en el mapa o escribe una dirección de referencia.
+                </p>
+              </div>
+            </div>
+
 
             <div className="flex gap-4 justify-end">
               <Button

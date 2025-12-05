@@ -1,21 +1,82 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  asignacionesMock,
-  getNiñoById,
-  getPadrinoById,
-  getEventoById,
-} from "@/services/mockData";
-import { Pencil, ArrowLeft, User, Heart, Calendar } from "lucide-react";
+  ApadrinamientosService,
+  NinosService,
+  PadrinosService,
+  Apadrinamiento,
+  Nino,
+  Padrino
+} from "@/services/api";
+import { Pencil, ArrowLeft, User, Heart, Calendar, MapPin } from "lucide-react";
 import { toast } from "sonner";
+import { GoogleMap, Marker, useLoadScript } from "@react-google-maps/api";
+
+const mapContainerStyle = {
+  width: "100%",
+  height: "300px",
+  borderRadius: "0.5rem",
+};
 
 export default function AsignacionDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const asignacion = asignacionesMock.find((a) => a.id === id);
+
+  const [loading, setLoading] = useState(true);
+  const [asignacion, setAsignacion] = useState<Apadrinamiento | null>(null);
+  const [nino, setNino] = useState<Nino | null>(null);
+  const [padrino, setPadrino] = useState<Padrino | null>(null);
+
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: "AIzaSyBiJF9_m9VuwovcpOLUDBblpiOTg_DvS5E", // REPLACE WITH REAL KEY
+  });
+
+  useEffect(() => {
+    if (id) {
+      loadData(id);
+    }
+  }, [id]);
+
+  const loadData = async (apadrinamientoId: string) => {
+    try {
+      setLoading(true);
+      const data = await ApadrinamientosService.getById(apadrinamientoId);
+      if (!data) {
+        setAsignacion(null);
+        return;
+      }
+      setAsignacion(data);
+
+      // Fetch related entities
+      if (data.id_nino) {
+        const ninoData = await NinosService.getById(data.id_nino);
+        setNino(ninoData);
+      }
+      if (data.id_padrino) {
+        const padrinoData = await PadrinosService.getById(data.id_padrino);
+        setPadrino(padrinoData);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al cargar la asignación");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
 
   if (!asignacion) {
     return (
@@ -30,9 +91,10 @@ export default function AsignacionDetalle() {
     );
   }
 
-  const niño = getNiñoById(asignacion.niñoId);
-  const padrino = getPadrinoById(asignacion.padrinoId);
-  const evento = getEventoById(asignacion.eventoId);
+  const mapCenter = {
+    lat: asignacion.ubicacion_entrega_lat || 21.8853,
+    lng: asignacion.ubicacion_entrega_lng || -102.2916,
+  };
 
   return (
     <div className="space-y-6">
@@ -41,7 +103,7 @@ export default function AsignacionDetalle() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Detalle de Asignación</h1>
-          <p className="text-muted-foreground">Información completa del apadrinamiento</p>
+          <p className="text-muted-foreground">Información completa del apadrinamiento ({asignacion.id_apadrinamiento})</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate("/asignaciones")}>
@@ -67,27 +129,23 @@ export default function AsignacionDetalle() {
             <div>
               <p className="text-sm text-muted-foreground">Nombre Completo</p>
               <p className="font-medium">
-                {niño?.nombre} {niño?.apellidos}
+                {nino ? nino.nombre : "Cargando..."}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Edad</p>
-                <p className="font-medium">{niño?.edad} años</p>
+                <p className="font-medium">{nino?.edad} años</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Género</p>
-                <p className="font-medium">{niño?.genero}</p>
+                <p className="font-medium">{nino?.genero}</p>
               </div>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Escuela</p>
-              <p className="font-medium">{niño?.escuela}</p>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/ninos/${niño?.id}`)}
+              onClick={() => navigate(`/ninos/${nino?.id_nino}`)}
             >
               Ver perfil completo
             </Button>
@@ -105,25 +163,17 @@ export default function AsignacionDetalle() {
             <div>
               <p className="text-sm text-muted-foreground">Nombre Completo</p>
               <p className="font-medium">
-                {padrino?.nombre} {padrino?.apellidos}
+                {padrino ? padrino.nombre : "Cargando..."}
               </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
               <p className="font-medium">{padrino?.email}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Teléfono</p>
-              <p className="font-medium">{padrino?.telefono}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Niños Apadrinados</p>
-              <p className="font-medium">{padrino?.niñosApadrinados}</p>
-            </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/padrinos/${padrino?.id}`)}
+              onClick={() => navigate(`/padrinos/${padrino?.id_padrino}`)}
             >
               Ver perfil completo
             </Button>
@@ -141,25 +191,52 @@ export default function AsignacionDetalle() {
         <CardContent className="space-y-4">
           <div className="grid md:grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Evento</p>
-              <p className="font-medium">{evento?.nombre || asignacion.eventoId}</p>
+              <p className="text-sm text-muted-foreground">Tipo</p>
+              <p className="font-medium">{asignacion.tipo_apadrinamiento}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Estado</p>
-              <Badge>{asignacion.estado}</Badge>
+              <Badge>{asignacion.estado_apadrinamiento_registro}</Badge>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Fecha de Creación</p>
+              <p className="text-sm text-muted-foreground">Fecha de Inicio</p>
               <p className="font-medium">
-                {new Date(asignacion.fechaCreacion).toLocaleDateString()}
+                {new Date(asignacion.fecha_inicio).toLocaleDateString()}
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          {asignacion.notas && (
+      {/* Google Maps Location Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Ubicación de Entrega
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {asignacion.direccion_entrega && (
             <div>
-              <p className="text-sm text-muted-foreground">Notas</p>
-              <p className="font-medium">{asignacion.notas}</p>
+              <p className="text-sm text-muted-foreground">Dirección</p>
+              <p className="font-medium">{asignacion.direccion_entrega}</p>
+            </div>
+          )}
+
+          {isLoaded && asignacion.ubicacion_entrega_lat && asignacion.ubicacion_entrega_lng ? (
+            <div className="border rounded-md overflow-hidden">
+              <GoogleMap
+                mapContainerStyle={mapContainerStyle}
+                center={mapCenter}
+                zoom={15}
+              >
+                <Marker position={mapCenter} />
+              </GoogleMap>
+            </div>
+          ) : (
+            <div className="p-4 bg-muted/50 rounded-md text-center text-muted-foreground">
+              {isLoaded ? "No hay ubicación de mapa registrada." : "Cargando mapa..."}
             </div>
           )}
         </CardContent>
@@ -170,22 +247,7 @@ export default function AsignacionDetalle() {
           <CardTitle>Acciones Disponibles</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-4">
-          {asignacion.estado === "Pendiente" && (
-            <Button onClick={() => toast.success("Asignación aceptada")}>
-              Marcar como Aceptado
-            </Button>
-          )}
-          {asignacion.estado === "Aceptado" && (
-            <Button onClick={() => toast.success("Entrega registrada")}>
-              Registrar Entrega
-            </Button>
-          )}
-          {asignacion.estado === "Entrega registrada" && (
-            <Button onClick={() => toast.success("Entrega verificada")}>
-              Verificar Entrega
-            </Button>
-          )}
-          <Button variant="destructive" onClick={() => toast.error("Asignación cancelada")}>
+          <Button variant="destructive" onClick={() => toast.error("Función no implementada aún")}>
             Cancelar Asignación
           </Button>
         </CardContent>

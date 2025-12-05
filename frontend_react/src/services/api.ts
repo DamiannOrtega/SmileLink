@@ -45,6 +45,9 @@ export interface Apadrinamiento {
   tipo_apadrinamiento: "Aleatorio" | "Elección Padrino";
   estado_apadrinamiento_registro: "Activo" | "Finalizado";
   entregas_ids: string[]; // FKs to Entrega
+  ubicacion_entrega_lat?: number;
+  ubicacion_entrega_lng?: number;
+  direccion_entrega?: string;
 }
 
 export interface Entrega {

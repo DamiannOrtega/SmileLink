@@ -14,7 +14,7 @@ const mapContainerStyle = {
 
 export default function GoogleMapComponent({ lat, lng, title }: GoogleMapComponentProps) {
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: "", // Se requerirá API key del usuario
+    googleMapsApiKey: "AIzaSyBiJF9_m9VuwovcpOLUDBblpiOTg_DvS5E", // API Key añadida
   });
 
   const center = {
