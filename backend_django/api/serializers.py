@@ -57,6 +57,10 @@ class ApadrinamientoSerializer(serializers.Serializer):
         child=serializers.CharField(),
         default=list
     )
+    # Ubicación de entrega (Google Maps)
+    ubicacion_entrega_lat = serializers.FloatField(required=False, allow_null=True)
+    ubicacion_entrega_lng = serializers.FloatField(required=False, allow_null=True)
+    direccion_entrega = serializers.CharField(required=False, allow_blank=True)
 
 
 class EntregaSerializer(serializers.Serializer):
