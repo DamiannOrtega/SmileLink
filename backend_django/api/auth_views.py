@@ -222,3 +222,67 @@ def logout(request):
         {'message': 'Sesión cerrada exitosamente'},
         status=status.HTTP_200_OK
     )
+
+
+@api_view(['POST'])
+def google_login(request):
+    """
+    Login con token de Google
+    """
+    token = request.data.get('token')
+    if not token:
+        return Response({'error': 'Token requerido'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Verificar token con Google
+    google_url = f"https://oauth2.googleapis.com/tokeninfo?id_token={token}"
+    try:
+        import requests
+        response = requests.get(google_url)
+        
+        if response.status_code != 200:
+            return Response({'error': 'Token inválido'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        google_data = response.json()
+        email = google_data.get('email')
+        google_id = google_data.get('sub')
+        name = google_data.get('name')
+        
+        # Buscar usuario en NFS/Storage
+        storage = get_storage_manager()
+        padrinos = storage.list_all('padrinos')
+        
+        padrino_encontrado = None
+        for p in padrinos:
+            if p.get('email') == email:
+                padrino_encontrado = p
+                break
+        
+        if padrino_encontrado:
+            # Login exitoso
+            return Response({
+                'message': 'Login exitoso',
+                'padrino': padrino_encontrado
+            })
+        else:
+            # Registrar nuevo usuario
+            new_id = storage.get_next_id('padrinos', 'P')
+            new_padrino = {
+                'id_padrino': new_id,
+                'nombre': name,
+                'email': email,
+                'id_google_auth': google_id,
+                'fecha_registro': datetime.now().strftime('%Y-%m-%d'),
+                'direccion': '',
+                'telefono': '',
+                'historial_apadrinamiento_ids': []
+            }
+            # GUARDAR EN NFS (Automático por FileStorageManager)
+            storage.save('padrinos', new_id, new_padrino)
+            
+            return Response({
+                'message': 'Registro exitoso',
+                'padrino': new_padrino
+            }, status=status.HTTP_201_CREATED)
+            
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
