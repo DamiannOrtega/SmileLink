@@ -37,9 +37,35 @@ class NinosViewSet(viewsets.ViewSet):
     
     def create(self, request):
         """POST /api/ninos/"""
+        print(f"[NINOS] Received create request: {request.data}")
         serializer = NinoSerializer(data=request.data)
         if serializer.is_valid():
             new_id = storage.get_next_id('ninos', 'N')
+            data = serializer.validated_data
+            data['id_nino'] = new_id
+            
+            # Default fields
+            if 'estado_apadrinamiento' not in data:
+                data['estado_apadrinamiento'] = 'Disponible'
+            
+            storage.save('ninos', new_id, data)
+            sync.sync_entity('ninos', new_id)
+            return Response(data, status=status.HTTP_201_CREATED)
+        print(f"[NINOS] Validation error: {serializer.errors}")
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def partial_update(self, request, pk=None):
+        """PATCH /api/ninos/{id}/"""
+        nino = storage.load('ninos', pk)
+        if not nino:
+            return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        
+        nino.update(request.data)
+        storage.update('ninos', pk, nino)
+        sync.sync_entity('ninos', pk)
+        
+        serializer = NinoSerializer(nino)
+        return Response(serializer.data)
     
     @action(detail=True, methods=['post'], url_path='upload_avatar', parser_classes=[MultiPartParser, FormParser])
     def upload_avatar(self, request, pk=None):
