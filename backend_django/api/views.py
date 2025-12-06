@@ -40,6 +40,34 @@ class NinosViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             new_id = storage.get_next_id('ninos', 'N')
     
+    @action(detail=True, methods=['post'], url_path='upload_avatar')
+    def upload_avatar(self, request, pk=None):
+        """Sube y guarda el avatar generado"""
+        nino = storage.load('ninos', pk)
+        if not nino:
+            return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from .file_utils import save_avatar_file
+            avatar_url = save_avatar_file(pk, file_obj)
+            
+            # Update Nino record
+            nino['avatar_url'] = avatar_url
+            storage.update('ninos', pk, nino)
+            try:
+                sync.sync_entity('ninos', pk)
+            except:
+                pass # Ignore sync errors in dev
+            
+            return Response({'status': 'Avatar subido', 'avatar_url': avatar_url})
+        except Exception as e:
+            print(f"Error uploading avatar: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def destroy(self, request, pk=None):
         """DELETE /api/ninos/{id}/"""
         if storage.delete('ninos', pk):
