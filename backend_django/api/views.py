@@ -39,40 +39,6 @@ class NinosViewSet(viewsets.ViewSet):
         serializer = NinoSerializer(data=request.data)
         if serializer.is_valid():
             new_id = storage.get_next_id('ninos', 'N')
-            data = serializer.validated_data
-            data['id_nino'] = new_id
-            storage.save('ninos', new_id, data)
-            sync.sync_entity('ninos', new_id)
-            return Response(data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def update(self, request, pk=None):
-        """PUT /api/ninos/{id}/"""
-        nino = storage.load('ninos', pk)
-        if not nino:
-            return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-        
-        serializer = NinoSerializer(data=request.data)
-        if serializer.is_valid():
-            data = serializer.validated_data
-            data['id_nino'] = pk
-            storage.update('ninos', pk, data)
-            sync.sync_entity('ninos', pk)
-            return Response(data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    def partial_update(self, request, pk=None):
-        """PATCH /api/ninos/{id}/"""
-        nino = storage.load('ninos', pk)
-        if not nino:
-            return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-        
-        nino.update(request.data)
-        storage.update('ninos', pk, nino)
-        sync.sync_entity('ninos', pk)
-        
-        serializer = NinoSerializer(nino)
-        return Response(serializer.data)
     
     def destroy(self, request, pk=None):
         """DELETE /api/ninos/{id}/"""
