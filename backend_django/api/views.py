@@ -48,6 +48,11 @@ class NinosViewSet(viewsets.ViewSet):
             if 'estado_apadrinamiento' not in data:
                 data['estado_apadrinamiento'] = 'Disponible'
             
+            # Convertir fecha_apadrinamiento_actual a string si es date object
+            if 'fecha_apadrinamiento_actual' in data and data['fecha_apadrinamiento_actual']:
+                if hasattr(data['fecha_apadrinamiento_actual'], 'isoformat'):
+                    data['fecha_apadrinamiento_actual'] = data['fecha_apadrinamiento_actual'].isoformat()
+            
             storage.save('ninos', new_id, data)
             sync.sync_entity('ninos', new_id)
             return Response(data, status=status.HTTP_201_CREATED)
@@ -123,6 +128,15 @@ class PadrinosViewSet(viewsets.ViewSet):
             new_id = storage.get_next_id('padrinos', 'P')
             data = serializer.validated_data
             data['id_padrino'] = new_id
+            
+            # Convertir fecha_registro a string si es date object
+            if 'fecha_registro' in data and hasattr(data['fecha_registro'], 'isoformat'):
+                data['fecha_registro'] = data['fecha_registro'].isoformat()
+            
+            # Inicializar historial si no está presente
+            if 'historial_apadrinamiento_ids' not in data:
+                data['historial_apadrinamiento_ids'] = []
+            
             storage.save('padrinos', new_id, data)
             sync.sync_entity('padrinos', new_id)
             return Response(data, status=status.HTTP_201_CREATED)
