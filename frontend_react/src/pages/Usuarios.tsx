@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Search, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +21,14 @@ import { AdministradoresService, Administrador } from "@/services/api";
 
 export default function Usuarios() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [usuarios, setUsuarios] = useState<Administrador[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     loadUsuarios();
-  }, []);
+  }, [location.pathname]);
 
   const loadUsuarios = async () => {
     try {

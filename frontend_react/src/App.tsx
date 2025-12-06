@@ -16,9 +16,6 @@ import PadrinoDetalle from "./pages/PadrinoDetalle";
 import Asignaciones from "./pages/Asignaciones";
 import AsignacionNueva from "./pages/AsignacionNueva";
 import AsignacionDetalle from "./pages/AsignacionDetalle";
-import Cartas from "./pages/Cartas";
-import CartaNueva from "./pages/CartaNueva";
-import CartaDetalle from "./pages/CartaDetalle";
 import Regalos from "./pages/Regalos";
 import Entregas from "./pages/Entregas";
 import Ubicaciones from "./pages/Ubicaciones";
@@ -56,10 +53,6 @@ const App = () => (
           <Route path="/asignaciones/nueva" element={<AdminLayout><AsignacionNueva /></AdminLayout>} />
           <Route path="/asignaciones/:id" element={<AdminLayout><AsignacionDetalle /></AdminLayout>} />
           <Route path="/asignaciones/:id/editar" element={<AdminLayout><AsignacionNueva /></AdminLayout>} />
-          <Route path="/cartas" element={<AdminLayout><Cartas /></AdminLayout>} />
-          <Route path="/cartas/nueva" element={<AdminLayout><CartaNueva /></AdminLayout>} />
-          <Route path="/cartas/:id" element={<AdminLayout><CartaDetalle /></AdminLayout>} />
-          <Route path="/cartas/:id/editar" element={<AdminLayout><CartaNueva /></AdminLayout>} />
           <Route path="/regalos" element={<AdminLayout><Regalos /></AdminLayout>} />
           <Route path="/entregas" element={<AdminLayout><Entregas /></AdminLayout>} />
           <Route path="/ubicaciones" element={<AdminLayout><Ubicaciones /></AdminLayout>} />

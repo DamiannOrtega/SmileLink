@@ -47,7 +47,14 @@ export default function PadrinoDetalle() {
       ]);
 
       setPadrino(padrinoData);
-      setApadrinamientos(apadrinamientosData);
+      
+      // Filtrar apadrinamientos que tienen niño válido (no eliminado)
+      const ninosIds = new Set(ninosData.map(n => n.id_nino));
+      const apadrinamientosValidos = apadrinamientosData.filter(
+        (apad) => ninosIds.has(apad.id_nino)
+      );
+      
+      setApadrinamientos(apadrinamientosValidos);
       setNinosMap(new Map(ninosData.map(n => [n.id_nino, n.nombre])));
     } catch (err) {
       toast.error("Error al cargar datos del padrino");

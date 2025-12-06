@@ -1150,9 +1150,35 @@ export const EventosService = {
       await delay();
       const index = MOCK_EVENTOS.findIndex((e) => e.id_evento === id);
       if (index !== -1) MOCK_EVENTOS.splice(index, 1);
+      
+      // Eliminar también de localStorage
+      try {
+        const saved = localStorage.getItem("mock_eventos");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Evento[];
+          const filtered = parsed.filter(e => e.id_evento !== id);
+          localStorage.setItem("mock_eventos", JSON.stringify(filtered));
+        }
+      } catch (e) {
+        console.warn("Error al eliminar evento de localStorage:", e);
+      }
+      
       return;
     }
-    return fetchAPI<void>(`/eventos/${id}/`, { method: "DELETE" });
+    // Si no es mock, eliminar de la API y también de localStorage
+    await fetchAPI<void>(`/eventos/${id}/`, { method: "DELETE" });
+    
+    // Eliminar también de localStorage
+    try {
+      const saved = localStorage.getItem("api_eventos");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Evento[];
+        const filtered = parsed.filter(e => e.id_evento !== id);
+        localStorage.setItem("api_eventos", JSON.stringify(filtered));
+      }
+    } catch (e) {
+      console.warn("Error al eliminar evento de localStorage:", e);
+    }
   },
 
   async getActivos(): Promise<Evento[]> {

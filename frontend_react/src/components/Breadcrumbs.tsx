@@ -14,7 +14,6 @@ const routeNames: Record<string, string> = {
   "/ninos": "Niños",
   "/padrinos": "Padrinos",
   "/asignaciones": "Asignaciones",
-  "/cartas": "Cartas",
   "/regalos": "Regalos",
   "/entregas": "Entregas",
   "/ubicaciones": "Ubicaciones",

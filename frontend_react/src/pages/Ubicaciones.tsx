@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye, MapPin } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { Plus, Search, Eye, MapPin, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,17 +17,22 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { PuntosEntregaService, PuntoEntrega } from "@/services/api";
 
 export default function Ubicaciones() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [ubicaciones, setUbicaciones] = useState<PuntoEntrega[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [ubicacionToDelete, setUbicacionToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadUbicaciones();
-  }, []);
+  }, [location.pathname]);
 
   const loadUbicaciones = async () => {
     try {
@@ -44,6 +50,30 @@ export default function Ubicaciones() {
     ubicacion.nombre_punto.toLowerCase().includes(searchTerm.toLowerCase()) ||
     ubicacion.direccion_fisica.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDelete = (id: string) => {
+    setUbicacionToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!ubicacionToDelete) return;
+
+    try {
+      setDeleting(true);
+      await PuntosEntregaService.delete(ubicacionToDelete);
+      toast.success("Ubicación eliminada exitosamente");
+      setDeleteDialogOpen(false);
+      setUbicacionToDelete(null);
+      // Recargar la lista
+      await loadUbicaciones();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Error al eliminar ubicación";
+      toast.error(errorMsg);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -127,13 +157,25 @@ export default function Ubicaciones() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(`/ubicaciones/${ubicacion.id_punto_entrega}`)}
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/ubicaciones/${ubicacion.id_punto_entrega}`)}
+                        title="Ver detalles"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(ubicacion.id_punto_entrega)}
+                        title="Eliminar ubicación"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -141,6 +183,16 @@ export default function Ubicaciones() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Eliminar Ubicación"
+        description="¿Estás seguro de que deseas eliminar esta ubicación? Esta acción no se puede deshacer."
+        onConfirm={confirmDelete}
+        confirmText={deleting ? "Eliminando..." : "Eliminar"}
+        cancelText="Cancelar"
+      />
     </div>
   );
 }

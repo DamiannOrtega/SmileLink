@@ -30,7 +30,6 @@ const menuItems = [
   { title: "Niños", url: "/ninos", icon: Users },
   { title: "Padrinos", url: "/padrinos", icon: Heart },
   { title: "Asignaciones", url: "/asignaciones", icon: Link2 },
-  { title: "Cartas", url: "/cartas", icon: Mail },
   { title: "Regalos", url: "/regalos", icon: Gift },
   { title: "Entregas", url: "/entregas", icon: Package },
   { title: "Ubicaciones", url: "/ubicaciones", icon: MapPin },

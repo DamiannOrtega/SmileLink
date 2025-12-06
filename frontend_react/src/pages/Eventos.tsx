@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Plus, Search, Pencil, Calendar } from "lucide-react";
+import { Plus, Search, Pencil, Calendar, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { EventosService, Evento } from "@/services/api";
 
 export default function Eventos() {
@@ -25,6 +26,9 @@ export default function Eventos() {
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadEventos();
@@ -53,6 +57,30 @@ export default function Eventos() {
       "Cerrado": "secondary",
     };
     return <Badge variant={variants[estado]}>{estado}</Badge>;
+  };
+
+  const handleDelete = (id: string) => {
+    setEventoToDelete(id);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!eventoToDelete) return;
+
+    try {
+      setDeleting(true);
+      await EventosService.delete(eventoToDelete);
+      toast.success("Evento eliminado exitosamente");
+      setDeleteDialogOpen(false);
+      setEventoToDelete(null);
+      // Recargar la lista
+      await loadEventos();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Error al eliminar evento";
+      toast.error(errorMsg);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading) {
@@ -129,14 +157,25 @@ export default function Eventos() {
                   <TableCell>{new Date(evento.fecha_fin).toLocaleDateString()}</TableCell>
                   <TableCell>{getEstadoBadge(evento.estado_evento)}</TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => navigate(`/eventos/${evento.id_evento}/editar`)}
-                      title="Editar evento"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/eventos/${evento.id_evento}/editar`)}
+                        title="Editar evento"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(evento.id_evento)}
+                        title="Eliminar evento"
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -144,6 +183,16 @@ export default function Eventos() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Eliminar Evento"
+        description="¿Estás seguro de que deseas eliminar este evento? Esta acción no se puede deshacer."
+        onConfirm={confirmDelete}
+        confirmText={deleting ? "Eliminando..." : "Eliminar"}
+        cancelText="Cancelar"
+      />
     </div>
   );
 }
