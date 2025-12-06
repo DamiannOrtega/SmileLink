@@ -2,6 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useNotificationEvents } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ export default function CartaNueva() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
+  const { showNotification } = useNotificationEvents();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,6 +68,16 @@ export default function CartaNueva() {
   const onSubmit = (data: FormValues) => {
     console.log(isEditing ? "Editando carta:" : "Nueva carta:", data);
     toast.success(isEditing ? "Carta actualizada exitosamente" : "Carta registrada exitosamente");
+    
+    if (!isEditing) {
+      // Mostrar notificación si está habilitada
+      showNotification(
+        "info",
+        "Nueva Solicitud de Regalo",
+        `Nueva solicitud creada: ${data.descripcion_solicitud.substring(0, 50)}...`
+      );
+    }
+    
     navigate("/cartas");
   };
 

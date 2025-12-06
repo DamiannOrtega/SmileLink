@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Search, Eye, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import { PadrinosService, Padrino } from "@/services/api";
 
 export default function Padrinos() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [padrinos, setPadrinos] = useState<Padrino[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -29,7 +31,7 @@ export default function Padrinos() {
 
   useEffect(() => {
     loadPadrinos();
-  }, []);
+  }, [location.pathname]);
 
   const loadPadrinos = async () => {
     try {
@@ -60,9 +62,11 @@ export default function Padrinos() {
       toast.success("Padrino eliminado exitosamente");
       setDeleteDialogOpen(false);
       setPadrinoToDelete(null);
+      // Recargar la lista
       await loadPadrinos();
     } catch (err) {
-      toast.error("Error al eliminar padrino");
+      const errorMsg = err instanceof Error ? err.message : "Error al eliminar padrino";
+      toast.error(errorMsg);
     }
   };
 

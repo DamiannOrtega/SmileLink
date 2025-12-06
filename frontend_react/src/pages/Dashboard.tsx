@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { Users, Heart, Link2, PackageCheck, AlertCircle, Calendar } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { Users, Heart, Link2, PackageCheck, AlertCircle, Calendar, Bell } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNotifications } from "@/hooks/useNotifications";
 import {
   DashboardService,
   DashboardKPIs,
@@ -13,20 +15,107 @@ import {
   ApadrinamientosService,
   Apadrinamiento,
   NinosService,
-  PadrinosService
+  PadrinosService,
+  EntregasService,
+  SolicitudesService
 } from "@/services/api";
 
 export default function Dashboard() {
+  const location = useLocation();
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [asignaciones, setAsignaciones] = useState<Apadrinamiento[]>([]);
   const [loading, setLoading] = useState(true);
   const [ninosMap, setNinosMap] = useState<Map<string, string>>(new Map());
   const [padrinosMap, setPadrinosMap] = useState<Map<string, string>>(new Map());
+  const [notificaciones, setNotificaciones] = useState<Array<{
+    id: string;
+    tipo: "info" | "warning" | "success" | "error";
+    titulo: string;
+    mensaje: string;
+    fecha: Date;
+  }>>([]);
+
+  // Activar sistema de notificaciones
+  useNotifications(true);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+    checkNotifications();
+    
+    // Verificar notificaciones periódicamente
+    const interval = setInterval(() => {
+      checkNotifications();
+    }, 60000); // Cada minuto
+    
+    return () => clearInterval(interval);
+  }, [location.pathname]);
+
+  const checkNotifications = async () => {
+    try {
+      const config = JSON.parse(localStorage.getItem("appConfig") || "{}");
+      const nuevasNotificaciones: typeof notificaciones = [];
+
+      // Verificar entregas pendientes
+      if (config.notifEntregas !== false) {
+        const entregas = await EntregasService.getAll().catch(() => []);
+        const pendientes = entregas.filter(
+          (e) => e.estado_entrega === "Pendiente" || e.estado_entrega === "En Proceso"
+        );
+
+        if (pendientes.length > 0) {
+          nuevasNotificaciones.push({
+            id: "entregas-pendientes",
+            tipo: "warning",
+            titulo: "Entregas Pendientes",
+            mensaje: `Hay ${pendientes.length} entregas pendientes de verificación`,
+            fecha: new Date(),
+          });
+        }
+      }
+
+      // Verificar solicitudes abiertas
+      if (config.notifCartas !== false) {
+        const solicitudes = await SolicitudesService.getAll().catch(() => []);
+        const abiertas = solicitudes.filter((s) => s.estado_solicitud === "Abierta");
+
+        if (abiertas.length > 0) {
+          nuevasNotificaciones.push({
+            id: "solicitudes-abiertas",
+            tipo: "info",
+            titulo: "Solicitudes Abiertas",
+            mensaje: `Hay ${abiertas.length} solicitudes de regalos abiertas`,
+            fecha: new Date(),
+          });
+        }
+      }
+
+      // Verificar nuevos apadrinamientos recientes
+      if (config.notifNuevos !== false) {
+        const apadrinamientos = await ApadrinamientosService.getAll().catch(() => []);
+        const recientes = apadrinamientos.filter((a) => {
+          const fechaInicio = new Date(a.fecha_inicio);
+          const ahora = new Date();
+          const horasDiferencia = (ahora.getTime() - fechaInicio.getTime()) / (1000 * 60 * 60);
+          return horasDiferencia < 24 && a.estado_apadrinamiento_registro === "Activo";
+        });
+
+        if (recientes.length > 0) {
+          nuevasNotificaciones.push({
+            id: "nuevos-apadrinamientos",
+            tipo: "success",
+            titulo: "Nuevos Apadrinamientos",
+            mensaje: `${recientes.length} nuevo(s) apadrinamiento(s) en las últimas 24 horas`,
+            fecha: new Date(),
+          });
+        }
+      }
+
+      setNotificaciones(nuevasNotificaciones);
+    } catch (error) {
+      console.error("Error verificando notificaciones:", error);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -121,31 +210,65 @@ export default function Dashboard() {
         />
       </div>
 
-      {/* Alertas rápidas */}
-      <Card className="border-l-4 border-l-warning bg-warning/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertCircle className="h-5 w-5 text-warning" />
-            Alertas Rápidas
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="space-y-2 text-sm">
-            <li className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-warning" />
-              {kpis.solicitudes_abiertas} solicitudes abiertas
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-warning" />
-              {kpis.entregas_pendientes} entregas pendientes de verificación
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-success" />
-              Sistema funcionando correctamente
-            </li>
-          </ul>
-        </CardContent>
-      </Card>
+      {/* Notificaciones y Alertas */}
+      {(notificaciones.length > 0 || kpis.entregas_pendientes > 0 || kpis.solicitudes_abiertas > 0) && (
+        <Card className="border-l-4 border-l-warning bg-warning/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Bell className="h-5 w-5 text-warning" />
+              Notificaciones y Alertas
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {notificaciones.map((notif) => {
+                const iconColor = {
+                  info: "text-blue-500",
+                  warning: "text-warning",
+                  success: "text-success",
+                  error: "text-destructive",
+                }[notif.tipo];
+
+                return (
+                  <div
+                    key={notif.id}
+                    className="flex items-start gap-3 rounded-lg border border-border bg-card p-3"
+                  >
+                    <AlertCircle className={`h-5 w-5 ${iconColor} mt-0.5`} />
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm">{notif.titulo}</p>
+                      <p className="text-xs text-muted-foreground">{notif.mensaje}</p>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {notificaciones.length === 0 && (
+                <ul className="space-y-2 text-sm">
+                  {kpis.solicitudes_abiertas > 0 && (
+                    <li className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-warning" />
+                      {kpis.solicitudes_abiertas} solicitudes abiertas
+                    </li>
+                  )}
+                  {kpis.entregas_pendientes > 0 && (
+                    <li className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-warning" />
+                      {kpis.entregas_pendientes} entregas pendientes de verificación
+                    </li>
+                  )}
+                  {kpis.solicitudes_abiertas === 0 && kpis.entregas_pendientes === 0 && (
+                    <li className="flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-success" />
+                      Sistema funcionando correctamente
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Próximos eventos */}

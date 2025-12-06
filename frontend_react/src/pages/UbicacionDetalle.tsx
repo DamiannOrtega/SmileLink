@@ -74,7 +74,7 @@ export default function UbicacionDetalle() {
         </div>
         <div className="flex gap-2">
           {/* Implement edit if needed later */}
-          <Button onClick={() => toast.success("Función editar pendiente")}>
+          <Button onClick={() => navigate(`/ubicaciones/${id}/editar`)}>
             <Pencil className="mr-2 h-4 w-4" />
             Editar
           </Button>

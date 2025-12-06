@@ -7,9 +7,52 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Settings, Bell, Shield, Palette } from "lucide-react";
 import { toast } from "sonner";
+import { useTheme } from "@/contexts/ThemeContext";
+import { useState, useEffect } from "react";
 
 export default function Configuracion() {
+  const { theme, toggleTheme } = useTheme();
+  const [darkMode, setDarkMode] = useState(theme === "dark");
+  const [config, setConfig] = useState({
+    limiteNinos: "3",
+    diasEntrega: "7",
+    notifNuevos: true,
+    notifEntregas: true,
+    notifCartas: true,
+    twoFactor: false,
+    timeout: "60",
+    mensajeBienvenida: "Bienvenido al sistema SmileLink",
+  });
+
+  useEffect(() => {
+    // Cargar configuración guardada
+    const saved = localStorage.getItem("appConfig");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setConfig((prev) => ({ ...prev, ...parsed }));
+      } catch (e) {
+        console.error("Error al cargar configuración:", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    setDarkMode(theme === "dark");
+  }, [theme]);
+
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked);
+    if (checked && theme !== "dark") {
+      toggleTheme();
+    } else if (!checked && theme !== "light") {
+      toggleTheme();
+    }
+  };
+
   const handleSave = () => {
+    // Guardar configuración
+    localStorage.setItem("appConfig", JSON.stringify(config));
     toast.success("Configuración guardada exitosamente");
   };
 
@@ -33,11 +76,21 @@ export default function Configuracion() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="limite-ninos">Límite de niños por padrino</Label>
-              <Input id="limite-ninos" type="number" defaultValue="3" />
+              <Input 
+                id="limite-ninos" 
+                type="number" 
+                value={config.limiteNinos}
+                onChange={(e) => setConfig(prev => ({ ...prev, limiteNinos: e.target.value }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="dias-entrega">Días para confirmar entrega</Label>
-              <Input id="dias-entrega" type="number" defaultValue="7" />
+              <Input 
+                id="dias-entrega" 
+                type="number" 
+                value={config.diasEntrega}
+                onChange={(e) => setConfig(prev => ({ ...prev, diasEntrega: e.target.value }))}
+              />
             </div>
             <Button onClick={handleSave}>Guardar Cambios</Button>
           </CardContent>
@@ -53,16 +106,29 @@ export default function Configuracion() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="notif-nuevos">Notificar nuevos apadrinamientos</Label>
-              <Switch id="notif-nuevos" defaultChecked />
+              <Switch 
+                id="notif-nuevos" 
+                checked={config.notifNuevos}
+                onCheckedChange={(checked) => setConfig(prev => ({ ...prev, notifNuevos: checked }))}
+              />
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="notif-entregas">Notificar entregas pendientes</Label>
-              <Switch id="notif-entregas" defaultChecked />
+              <Switch 
+                id="notif-entregas" 
+                checked={config.notifEntregas}
+                onCheckedChange={(checked) => setConfig(prev => ({ ...prev, notifEntregas: checked }))}
+              />
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="notif-cartas">Notificar nuevas cartas</Label>
-              <Switch id="notif-cartas" defaultChecked />
+              <Switch 
+                id="notif-cartas" 
+                checked={config.notifCartas}
+                onCheckedChange={(checked) => setConfig(prev => ({ ...prev, notifCartas: checked }))}
+              />
             </div>
+            <Button onClick={handleSave}>Guardar Cambios</Button>
           </CardContent>
         </Card>
 
@@ -76,11 +142,20 @@ export default function Configuracion() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="2fa">Autenticación de dos factores</Label>
-              <Switch id="2fa" />
+              <Switch 
+                id="2fa" 
+                checked={config.twoFactor}
+                onCheckedChange={(checked) => setConfig(prev => ({ ...prev, twoFactor: checked }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="timeout">Tiempo de sesión (minutos)</Label>
-              <Input id="timeout" type="number" defaultValue="60" />
+              <Input 
+                id="timeout" 
+                type="number" 
+                value={config.timeout}
+                onChange={(e) => setConfig(prev => ({ ...prev, timeout: e.target.value }))}
+              />
             </div>
             <Button onClick={handleSave}>Guardar Cambios</Button>
           </CardContent>
@@ -96,13 +171,18 @@ export default function Configuracion() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <Label htmlFor="dark-mode">Modo Oscuro</Label>
-              <Switch id="dark-mode" />
+              <Switch 
+                id="dark-mode" 
+                checked={darkMode}
+                onCheckedChange={handleDarkModeChange}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="mensaje-bienvenida">Mensaje de Bienvenida</Label>
               <Textarea
                 id="mensaje-bienvenida"
-                defaultValue="Bienvenido al sistema SmileLink"
+                value={config.mensajeBienvenida}
+                onChange={(e) => setConfig(prev => ({ ...prev, mensajeBienvenida: e.target.value }))}
                 rows={3}
               />
             </div>
