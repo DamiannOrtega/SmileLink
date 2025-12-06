@@ -60,6 +60,13 @@ interface SmileLinkApiService {
     
     @PATCH("entregas/{id}/")
     suspend fun updateEntrega(@Path("id") id: String, @Body entrega: Entrega): Response<Entrega>
+
+    @Multipart
+    @POST("entregas/{id}/upload_evidence/")
+    suspend fun uploadDeliveryEvidence(
+        @Path("id") id: String,
+        @Part file: okhttp3.MultipartBody.Part
+    ): Response<Map<String, String>>
     
     // ===== PUNTOS DE ENTREGA (Delivery Points) =====
     @GET("puntos-entrega/")

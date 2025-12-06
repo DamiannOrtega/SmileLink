@@ -383,7 +383,7 @@ const MOCK_EVENTOS: Evento[] = [
 // UTILIDADES
 // ============================================================================
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://192.168.193.177:8000/api";
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://192.168.193.177:8000/api";
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 
 /**

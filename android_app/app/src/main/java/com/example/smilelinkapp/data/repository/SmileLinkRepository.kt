@@ -5,6 +5,7 @@ import com.example.smilelinkapp.data.api.RetrofitClient
 import com.example.smilelinkapp.data.mock.MockDataProvider
 import com.example.smilelinkapp.data.model.*
 import kotlinx.coroutines.delay
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 
 /**
  * Repository for managing SmileLink data
@@ -226,6 +227,39 @@ class SmileLinkRepository {
                     Result.success(response.body()!!)
                 } else {
                     Result.failure(Exception("Error: ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun uploadEvidence(entregaId: String, imageUri: android.net.Uri, context: android.content.Context): Result<String> {
+        return if (AppConfig.USE_MOCK) {
+            delay(1000)
+            Result.success("mock_evidence_url.jpg")
+        } else {
+            try {
+                val contentResolver = context.contentResolver
+                val inputStream = contentResolver.openInputStream(imageUri)
+                    ?: return Result.failure(Exception("No se pudo abrir la imagen"))
+                
+                val bytes = inputStream.readBytes()
+                inputStream.close()
+                
+                val requestFile = okhttp3.RequestBody.create(
+                    "image/*".toMediaTypeOrNull(),
+                    bytes
+                )
+                
+                val body = okhttp3.MultipartBody.Part.createFormData("file", "evidence.jpg", requestFile)
+                
+                val response = apiService.uploadDeliveryEvidence(entregaId, body)
+                if (response.isSuccessful && response.body() != null) {
+                    val url = response.body()!!["evidence_url"] ?: ""
+                    Result.success(url)
+                } else {
+                    Result.failure(Exception("Error subiendo evidencia: ${response.code()}"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)

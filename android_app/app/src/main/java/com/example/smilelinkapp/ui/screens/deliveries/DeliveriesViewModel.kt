@@ -79,7 +79,7 @@ class DeliveriesViewModel : ViewModel() {
         }
     }
     
-    fun markAsDelivered(apadrinamientoId: String) {
+    fun markAsDelivered(apadrinamientoId: String, imageUri: android.net.Uri?, context: Context) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isUpdating = true)
             
@@ -126,6 +126,17 @@ class DeliveriesViewModel : ViewModel() {
                             error = "Error al crear registro de entrega: ${entregaResult.exceptionOrNull()?.message}"
                         )
                         return@launch
+                    }
+                    
+                    val createdEntrega = entregaResult.getOrNull()
+                    
+                    // Step 1.5: Upload Evidence if exists
+                    if (imageUri != null && createdEntrega != null) {
+                        val uploadResult = repository.uploadEvidence(createdEntrega.idEntrega, imageUri, context)
+                        if (uploadResult.isFailure) {
+                             // Log error but continue with status update
+                             android.util.Log.e("DeliveriesViewModel", "Error uploading evidence", uploadResult.exceptionOrNull())
+                        }
                     }
                     
                     // Step 2: Update Apadrinamiento status

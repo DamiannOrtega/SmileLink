@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.example.smilelinkapp.data.model.Apadrinamiento
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
@@ -97,28 +99,75 @@ fun DeliveriesScreen(
         )
     }
     
+    var evidenceImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        evidenceImageUri = uri
+    }
+    
     showConfirmDialog?.let { apadrinamientoId ->
         val nino = uiState.apadrinamientos.find { it.idApadrinamiento == apadrinamientoId }
             ?.let { uiState.ninosMap[it.idNino] }
         
         AlertDialog(
-            onDismissRequest = { showConfirmDialog = null },
+            onDismissRequest = { 
+                showConfirmDialog = null 
+                evidenceImageUri = null
+            },
             title = { Text("Confirmar Entrega") },
             text = {
-                Text("¿Estás seguro de que deseas marcar como entregado el regalo para ${nino?.nombre ?: "este niño"}?\n\nEsta acción no se puede deshacer.")
+                Column {
+                    Text("¿Estás seguro de que deseas marcar como entregado el regalo para ${nino?.nombre ?: "este niño"}?")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    if (evidenceImageUri != null) {
+                        AsyncImage(
+                            model = evidenceImageUri,
+                            contentDescription = "Evidencia",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = { evidenceImageUri = null }) {
+                            Text("Eliminar foto")
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Adjuntar foto de prueba")
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Esta acción no se puede deshacer.", style = MaterialTheme.typography.bodySmall)
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.markAsDelivered(apadrinamientoId)
+                        viewModel.markAsDelivered(apadrinamientoId, evidenceImageUri, context)
                         showConfirmDialog = null
-                    }
+                        evidenceImageUri = null
+                    },
+                    enabled = !uiState.isUpdating
                 ) {
                     Text("Confirmar")
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showConfirmDialog = null }) {
+                OutlinedButton(onClick = { 
+                    showConfirmDialog = null
+                    evidenceImageUri = null
+                }) {
                     Text("Cancelar")
                 }
             }
