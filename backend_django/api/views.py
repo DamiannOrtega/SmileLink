@@ -223,7 +223,14 @@ class EntregasViewSet(viewsets.ViewSet):
     """ViewSet para Entregas"""
     
     def list(self, request):
+        """GET /api/entregas/ with optional filtering by apadrinamiento"""
         entregas = storage.list_all('entregas')
+        
+        # Filter by apadrinamiento if query parameter provided
+        apadrinamiento_id = request.query_params.get('apadrinamiento', None)
+        if apadrinamiento_id:
+            entregas = [e for e in entregas if e.get('id_apadrinamiento') == apadrinamiento_id]
+        
         serializer = EntregaSerializer(entregas, many=True)
         return Response(serializer.data)
     
