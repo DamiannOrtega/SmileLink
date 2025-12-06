@@ -296,6 +296,7 @@ class EntregasViewSet(viewsets.ViewSet):
             entrega['estado_entrega'] = 'Entregado' # Auto-complete functionality
             entrega['fecha_entrega_real'] = request.data.get('fecha_entrega_real', date.today().isoformat())
             
+            entrega = make_serializable(entrega)
             storage.update('entregas', pk, entrega)
             sync.sync_entity('entregas', pk)
             
@@ -321,6 +322,7 @@ class EntregasViewSet(viewsets.ViewSet):
                 data['fecha_entrega_real'] = data['fecha_entrega_real'].isoformat()
             
             print(f"[ENTREGAS] Calling storage.save with data: {data}")
+            data = make_serializable(data)
             save_result = storage.save('entregas', new_id, data)
             print(f"[ENTREGAS] Save result: {save_result}")
             sync.sync_entity('entregas', new_id)
@@ -334,6 +336,7 @@ class EntregasViewSet(viewsets.ViewSet):
         if not entrega:
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
         entrega.update(request.data)
+        entrega = make_serializable(entrega)
         storage.update('entregas', pk, entrega)
         sync.sync_entity('entregas', pk)
         serializer = EntregaSerializer(entrega)
