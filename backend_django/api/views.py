@@ -235,6 +235,34 @@ class EntregasViewSet(viewsets.ViewSet):
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
         serializer = EntregaSerializer(entrega)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='upload_evidence', parser_classes=[MultiPartParser, FormParser])
+    def upload_evidence(self, request, pk=None):
+        """Sube foto de evidencia de entrega"""
+        entrega = storage.load('entregas', pk)
+        if not entrega:
+            return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from .file_utils import save_delivery_evidence
+            evidence_url = save_delivery_evidence(pk, file_obj)
+            
+            # Update Entrega record
+            entrega['evidencia_foto_path'] = evidence_url
+            entrega['estado_entrega'] = 'Entregado' # Auto-complete functionality
+            entrega['fecha_entrega_real'] = request.data.get('fecha_entrega_real', date.today().isoformat())
+            
+            storage.update('entregas', pk, entrega)
+            sync.sync_entity('entregas', pk)
+            
+            return Response({'status': 'Evidencia subida', 'evidence_url': evidence_url})
+        except Exception as e:
+            print(f"Error uploading evidence: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def create(self, request):
         print(f"[ENTREGAS] Received create request: {request.data}")
