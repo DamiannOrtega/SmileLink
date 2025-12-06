@@ -14,7 +14,6 @@ class NinoSerializer(serializers.Serializer):
     genero = serializers.ChoiceField(choices=['Masculino', 'Femenino'])
     descripcion = serializers.CharField()
     necesidades = serializers.ListField(child=serializers.CharField())
-    avatar_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     id_padrino_actual = serializers.CharField(required=False, allow_null=True)
     estado_apadrinamiento = serializers.ChoiceField(
         choices=['Disponible', 'Apadrinado'],

@@ -11,7 +11,6 @@ from .serializers import (
     EntregaSerializer, SolicitudRegaloSerializer, PuntoEntregaSerializer,
     AdministradorSerializer, EventoSerializer, DashboardKPIsSerializer
 )
-from .ai_utils import generate_avatar_image
 
 
 storage = get_storage_manager()
@@ -80,34 +79,6 @@ class NinosViewSet(viewsets.ViewSet):
         if storage.delete('ninos', pk):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-
-    @action(detail=True, methods=['post'])
-    def generate_avatar(self, request, pk=None):
-        """Generar avatar con IA basado en la descripción"""
-        nino = storage.load('ninos', pk)
-        if not nino:
-            return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-        
-        description = nino.get('descripcion', '')
-        if not description:
-             return Response({'error': 'El niño no tiene descripción'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            # Llamar al servicio de IA
-            # Nota: Esto devolverá el prompt optimizado o la imagen si está disponible
-            result = generate_avatar_image(description)
-            
-            # SI tuviéramos la imagen real en base64:
-            # nino['avatar_url'] = f"data:image/png;base64,{result['b64_data']}"
-            
-            # Como fallback por ahora devolvemos el resultado para debug
-            return Response({
-                'message': 'Proceso de IA completado', 
-                'result': result
-            })
-
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PadrinosViewSet(viewsets.ViewSet):
