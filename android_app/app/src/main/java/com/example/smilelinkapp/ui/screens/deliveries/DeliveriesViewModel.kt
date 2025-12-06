@@ -89,6 +89,46 @@ class DeliveriesViewModel : ViewModel() {
                 }
                 
                 if (apadrinamiento != null) {
+                    // Get child name for delivery description
+                    val nino = _uiState.value.ninosMap[apadrinamiento.idNino]
+                    val ninoName = nino?.nombre ?: "Niño"
+                    
+                    // Get punto de entrega - use first available or empty string
+                    val puntoEntregaId = _uiState.value.puntosEntregaMap.keys.firstOrNull() ?: ""
+                    
+                    if (puntoEntregaId.isEmpty()) {
+                        _uiState.value = _uiState.value.copy(
+                            isUpdating = false,
+                            error = "No hay puntos de entrega disponibles"
+                        )
+                        return@launch
+                    }
+                    
+                    // Get current date in ISO format
+                    val currentDate = java.time.LocalDate.now().toString()
+                    
+                    // Step 1: Create Entrega record
+                    val nuevaEntrega = com.example.smilelinkapp.data.model.Entrega(
+                        idApadrinamiento = apadrinamientoId,
+                        descripcionRegalo = "Regalo para $ninoName",
+                        fechaProgramada = currentDate,
+                        fechaEntregaReal = currentDate,
+                        estadoEntrega = "Entregado",
+                        observaciones = "Entrega realizada desde la app móvil",
+                        idPuntoEntrega = puntoEntregaId
+                    )
+                    
+                    val entregaResult = repository.createEntrega(nuevaEntrega)
+                    
+                    if (entregaResult.isFailure) {
+                        _uiState.value = _uiState.value.copy(
+                            isUpdating = false,
+                            error = "Error al crear registro de entrega: ${entregaResult.exceptionOrNull()?.message}"
+                        )
+                        return@launch
+                    }
+                    
+                    // Step 2: Update Apadrinamiento status
                     val updatedApadrinamiento = apadrinamiento.copy(
                         estadoApadrinamientoRegistro = "Entregado"
                     )
@@ -96,14 +136,10 @@ class DeliveriesViewModel : ViewModel() {
                     val result = repository.updateApadrinamiento(apadrinamientoId, updatedApadrinamiento)
                     
                     if (result.isSuccess) {
-                        // Update local state
-                        val updatedList = _uiState.value.apadrinamientos.map {
-                            if (it.idApadrinamiento == apadrinamientoId) {
-                                updatedApadrinamiento
-                            } else {
-                                it
-                            }
-                        }.filter { it.estadoApadrinamientoRegistro == "Activo" }
+                        // Update local state - remove from active deliveries
+                        val updatedList = _uiState.value.apadrinamientos.filter { 
+                            it.idApadrinamiento != apadrinamientoId 
+                        }
                         
                         _uiState.value = _uiState.value.copy(
                             apadrinamientos = updatedList,
@@ -113,7 +149,7 @@ class DeliveriesViewModel : ViewModel() {
                     } else {
                         _uiState.value = _uiState.value.copy(
                             isUpdating = false,
-                            error = "Error al actualizar el estado de entrega"
+                            error = "Error al actualizar el estado de apadrinamiento: ${result.exceptionOrNull()?.message}"
                         )
                     }
                 }
