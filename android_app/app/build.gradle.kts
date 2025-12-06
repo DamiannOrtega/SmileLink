@@ -68,9 +68,10 @@ dependencies {
     // Image Loading
     implementation(libs.coil.compose)
     
-    // Google Maps
-    implementation(libs.maps.compose)
-    implementation(libs.play.services.maps)
+    // OpenStreetMap (osmdroid) - free alternative to Google Maps
+    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    
+    // Google Play Services (for location and auth only, not maps)
     implementation(libs.play.services.location)
     implementation(libs.play.services.auth)
     

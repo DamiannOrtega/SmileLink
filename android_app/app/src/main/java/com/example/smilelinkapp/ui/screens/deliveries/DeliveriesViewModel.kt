@@ -44,10 +44,9 @@ class DeliveriesViewModel : ViewModel() {
                 
                 val apadrinamientos = apadrinamientosResult.getOrNull() ?: emptyList()
                 
-                // Filter only active sponsorships with delivery location
+                // Filter only active sponsorships (location is optional now)
                 val activeDeliveries = apadrinamientos.filter { 
-                    it.estadoApadrinamientoRegistro == "Activo" && 
-                    it.idPuntoEntrega != null 
+                    it.estadoApadrinamientoRegistro == "Activo"
                 }
                 
                 // Load ninos data
