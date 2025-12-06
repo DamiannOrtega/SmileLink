@@ -55,23 +55,11 @@ export default function NinoDetalle() {
 
   // --- ESTADO ULTRA-SIMPLIFICADO ---
   const [style, setStyle] = useState("avataaars");
-  const [gender, setGender] = useState("male");
   const [seed, setSeed] = useState("custom-avatar");
 
   useEffect(() => {
     loadData();
   }, [id]);
-
-  // Deducir género inicial
-  useEffect(() => {
-    if (nino && nino.genero) {
-      if (nino.genero.toLowerCase().includes("femenino") || nino.genero.toLowerCase().includes("mujer") || nino.genero.toLowerCase().includes("niña")) {
-        setGender("female");
-      } else {
-        setGender("male");
-      }
-    }
-  }, [nino]);
 
   const loadData = async () => {
     if (!id) return;
@@ -100,37 +88,26 @@ export default function NinoDetalle() {
   };
 
   const getAvatarUrl = () => {
-    // 1. Base URL
-    const baseUrl = `https://api.dicebear.com/9.x/${style}/png`;
-
-    // 2. Construir Parámetros
-    // TRUCO: Semilla única por género para que siempre se vean diferentes.
-    let params: any = {
-      seed: `${seed}-${gender}`,
-      backgroundColor: "b6e3f4" // Fondo suave por defecto
-    };
-
-    // 3. Lógica específica "Real" (Avataaars) para respetar género
-    if (style === "avataaars") {
-      params.accessoriesProbability = 0; // Niños sin gafas/accesorios por defecto
-      params.facialHairProbability = 0; // Niños sin barba
-
-      if (gender === 'female') {
-        params.top = ["longHair", "longHairBob", "longHairBun", "longHairCurly", "longHairCurvy", "longHairStraight", "longHairStraight2"];
-        params.clothing = ["blazerShirt", "collarSweater", "graphicShirt", "hoodie", "overall", "shirtCrewNeck", "shirtScoopNeck", "shirtVNeck"];
-      } else {
-        params.top = ["shortHair", "shortHairFrizzle", "shortHairShaggyMullet", "shortHairShortCurly", "shortHairShortFlat", "shortHairShortRound", "shortHairShortWaved", "shortHairSides", "shortHairTheCaesar", "shortHairTheCaesarSidePart"];
-        params.clothing = ["blazerShirt", "collarSweater", "graphicShirt", "hoodie", "overall", "shirtCrewNeck", "shirtVNeck"];
-      }
+    // Base URL de DiceBear - probar con diferentes versiones según el estilo
+    // Algunos estilos funcionan mejor con v6, otros con v7
+    let baseUrl: string;
+    if (style === "avataaars" || style === "open-peeps") {
+      // Para estos estilos, usar v6 que es más estable
+      baseUrl = `https://api.dicebear.com/6.x/${style}/png`;
+    } else {
+      // Para otros estilos, usar v7
+      baseUrl = `https://api.dicebear.com/7.x/${style}/png`;
     }
-    // Los demás estilos (Pixel, Adventurer, OpenPeeps) los maneja la semilla
+    
+    // Parámetros base usando URLSearchParams - semilla aleatoria sin género
+    const searchParams = new URLSearchParams();
+    searchParams.set('seed', seed);
+    searchParams.set('backgroundColor', 'b6e3f4');
+    searchParams.set('size', '400');
 
-    const searchParams = new URLSearchParams(params);
-    // DiceBear v9: array join con coma
-    if (Array.isArray(params.top)) searchParams.set('top', params.top.join(','));
-    if (Array.isArray(params.clothing)) searchParams.set('clothing', params.clothing.join(','));
-
-    return `${baseUrl}?${searchParams.toString()}`;
+    // Construir URL con parámetros
+    const url = `${baseUrl}?${searchParams.toString()}`;
+    return url;
   };
 
   // Helper para corregir URLs de localhost a IP real
@@ -148,8 +125,19 @@ export default function NinoDetalle() {
   };
 
   const regenerateSeed = () => {
-    setSeed(Math.random().toString(36).substring(7));
+    // Regenerar semilla para obtener un avatar diferente
+    const randomPart = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    setSeed(randomPart);
   };
+  
+  // Regenerar semilla cuando cambia el estilo para que se vea diferente
+  useEffect(() => {
+    if (nino && isDialogOpen) {
+      // Cuando cambia el estilo, regenerar semilla para nuevo avatar
+      const randomPart = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      setSeed(randomPart);
+    }
+  }, [style, isDialogOpen]);
 
   const handleSaveAvatar = async () => {
     if (!nino) return;
@@ -242,7 +230,7 @@ export default function NinoDetalle() {
                   <DialogHeader>
                     <DialogTitle>Elige tu Avatar</DialogTitle>
                     <DialogDescription>
-                      Selecciona si es niño o niña y el estilo que más te guste.
+                      Selecciona el estilo que más te guste.
                     </DialogDescription>
                   </DialogHeader>
 
@@ -250,9 +238,14 @@ export default function NinoDetalle() {
                     {/* Preview Centrado */}
                     <div className="flex flex-col items-center justify-center relative">
                       <img
+                        key={`${style}-${seed}`}
                         src={getAvatarUrl()}
                         alt="Preview"
                         className="w-48 h-48 rounded-full shadow-lg bg-white object-contain border-4 border-primary/10"
+                        onError={(e) => {
+                          console.error('Error cargando avatar:', getAvatarUrl());
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
                       />
                       <Button
                         variant="default"
@@ -264,28 +257,7 @@ export default function NinoDetalle() {
                       </Button>
                     </div>
 
-                    {/* 1. Género */}
-                    <div className="space-y-3">
-                      <Label className="text-center block">¿Eres Niño o Niña?</Label>
-                      <div className="grid grid-cols-2 gap-4 px-8">
-                        <Button
-                          variant={gender === "male" ? "default" : "outline"}
-                          onClick={() => setGender("male")}
-                          className="h-12 text-lg"
-                        >
-                          Niño 👦
-                        </Button>
-                        <Button
-                          variant={gender === "female" ? "default" : "outline"}
-                          onClick={() => setGender("female")}
-                          className="h-12 text-lg"
-                        >
-                          Niña 👧
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* 2. Estilo */}
+                    {/* Estilo */}
                     <div className="space-y-3">
                       <Label className="text-center block">¿Qué estilo prefieres?</Label>
                       <div className="grid grid-cols-2 gap-2">
