@@ -242,14 +242,28 @@ class EntregasViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def create(self, request):
+        print(f"[ENTREGAS] Received create request: {request.data}")
         serializer = EntregaSerializer(data=request.data)
         if serializer.is_valid():
+            print(f"[ENTREGAS] Serializer valid, validated data: {serializer.validated_data}")
             new_id = storage.get_next_id('entregas', 'E')
+            print(f"[ENTREGAS] Generated ID: {new_id}")
             data = serializer.validated_data
             data['id_entrega'] = new_id
-            storage.save('entregas', new_id, data)
+            
+            # Convert date objects to strings for JSON serialization
+            if 'fecha_programada' in data and hasattr(data['fecha_programada'], 'isoformat'):
+                data['fecha_programada'] = data['fecha_programada'].isoformat()
+            if 'fecha_entrega_real' in data and data['fecha_entrega_real'] and hasattr(data['fecha_entrega_real'], 'isoformat'):
+                data['fecha_entrega_real'] = data['fecha_entrega_real'].isoformat()
+            
+            print(f"[ENTREGAS] Calling storage.save with data: {data}")
+            save_result = storage.save('entregas', new_id, data)
+            print(f"[ENTREGAS] Save result: {save_result}")
             sync.sync_entity('entregas', new_id)
+            print(f"[ENTREGAS] Returning HTTP 201 with: {data}")
             return Response(data, status=status.HTTP_201_CREATED)
+        print(f"[ENTREGAS] Serializer invalid: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def partial_update(self, request, pk=None):
