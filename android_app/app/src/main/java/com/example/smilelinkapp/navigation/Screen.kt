@@ -3,7 +3,7 @@ package com.example.smilelinkapp.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Person
 
 /**
@@ -18,7 +18,7 @@ sealed class Screen(val route: String) {
         fun createRoute(childId: String) = "child_detail/$childId"
     }
     object MyChildren : Screen("my_children")
-    object Map : Screen("map")
+    object Deliveries : Screen("deliveries")
     object Profile : Screen("profile")
 }
 
@@ -42,10 +42,10 @@ sealed class BottomNavItem(
         icon = Icons.Default.Favorite
     )
     
-    object Map : BottomNavItem(
-        route = Screen.Map.route,
-        title = "Mapa",
-        icon = Icons.Default.Place
+    object Deliveries : BottomNavItem(
+        route = Screen.Deliveries.route,
+        title = "Entregas",
+        icon = Icons.Default.ShoppingCart
     )
     
     object Profile : BottomNavItem(
@@ -58,7 +58,7 @@ sealed class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem.Home,
     BottomNavItem.MyChildren,
-    BottomNavItem.Map,
+    BottomNavItem.Deliveries,
     BottomNavItem.Profile
 )
 

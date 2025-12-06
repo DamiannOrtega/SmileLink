@@ -1,0 +1,148 @@
+package com.example.smilelinkapp.ui.screens.deliveries
+
+import android.content.Context
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.smilelinkapp.data.local.SessionManager
+import com.example.smilelinkapp.data.model.Apadrinamiento
+import com.example.smilelinkapp.data.model.Nino
+import com.example.smilelinkapp.data.model.PuntoEntrega
+import com.example.smilelinkapp.data.repository.SmileLinkRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+/**
+ * ViewModel for Deliveries Screen
+ */
+class DeliveriesViewModel : ViewModel() {
+    
+    private val repository = SmileLinkRepository()
+    
+    private val _uiState = MutableStateFlow(DeliveriesUiState())
+    val uiState: StateFlow<DeliveriesUiState> = _uiState.asStateFlow()
+    
+    fun loadDeliveries(context: Context) {
+        val sessionManager = SessionManager(context)
+        val padrinoId = sessionManager.getPadrinoId() ?: return
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            
+            try {
+                // Get apadrinamientos for the current padrino
+                val apadrinamientosResult = repository.getApadrinamientosForPadrino(padrinoId)
+                
+                if (apadrinamientosResult.isFailure) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        error = apadrinamientosResult.exceptionOrNull()?.message ?: "Error desconocido"
+                    )
+                    return@launch
+                }
+                
+                val apadrinamientos = apadrinamientosResult.getOrNull() ?: emptyList()
+                
+                // Filter only active sponsorships with delivery location
+                val activeDeliveries = apadrinamientos.filter { 
+                    it.estadoApadrinamientoRegistro == "Activo" && 
+                    it.idPuntoEntrega != null 
+                }
+                
+                // Load ninos data
+                val ninosMap = mutableMapOf<String, Nino>()
+                activeDeliveries.forEach { apadrinamiento ->
+                    val ninoResult = repository.getNino(apadrinamiento.idNino)
+                    ninoResult.getOrNull()?.let { nino ->
+                        ninosMap[nino.idNino] = nino
+                    }
+                }
+                
+                // Load puntos de entrega
+                val puntosResult = repository.getPuntosEntrega()
+                val puntosMap = puntosResult.getOrNull()?.associateBy { it.idPuntoEntrega } ?: emptyMap()
+                
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    apadrinamientos = activeDeliveries,
+                    ninosMap = ninosMap,
+                    puntosEntregaMap = puntosMap,
+                    error = null
+                )
+                
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Error al cargar entregas"
+                )
+            }
+        }
+    }
+    
+    fun markAsDelivered(apadrinamientoId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isUpdating = true)
+            
+            try {
+                val apadrinamiento = _uiState.value.apadrinamientos.find { 
+                    it.idApadrinamiento == apadrinamientoId 
+                }
+                
+                if (apadrinamiento != null) {
+                    val updatedApadrinamiento = apadrinamiento.copy(
+                        estadoApadrinamientoRegistro = "Entregado"
+                    )
+                    
+                    val result = repository.updateApadrinamiento(apadrinamientoId, updatedApadrinamiento)
+                    
+                    if (result.isSuccess) {
+                        // Update local state
+                        val updatedList = _uiState.value.apadrinamientos.map {
+                            if (it.idApadrinamiento == apadrinamientoId) {
+                                updatedApadrinamiento
+                            } else {
+                                it
+                            }
+                        }.filter { it.estadoApadrinamientoRegistro == "Activo" }
+                        
+                        _uiState.value = _uiState.value.copy(
+                            apadrinamientos = updatedList,
+                            isUpdating = false,
+                            deliverySuccess = true
+                        )
+                    } else {
+                        _uiState.value = _uiState.value.copy(
+                            isUpdating = false,
+                            error = "Error al actualizar el estado de entrega"
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isUpdating = false,
+                    error = e.message ?: "Error al marcar como entregado"
+                )
+            }
+        }
+    }
+    
+    fun clearDeliverySuccess() {
+        _uiState.value = _uiState.value.copy(deliverySuccess = false)
+    }
+    
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(error = null)
+    }
+}
+
+data class DeliveriesUiState(
+    val isLoading: Boolean = false,
+    val isUpdating: Boolean = false,
+    val apadrinamientos: List<Apadrinamiento> = emptyList(),
+    val ninosMap: Map<String, Nino> = emptyMap(),
+    val puntosEntregaMap: Map<String, PuntoEntrega> = emptyMap(),
+    val error: String? = null,
+    val deliverySuccess: Boolean = false
+)
+

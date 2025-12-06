@@ -43,11 +43,12 @@ export interface Apadrinamiento {
   fecha_inicio: string; // YYYY-MM-DD
   fecha_fin?: string; // Date (Nullable)
   tipo_apadrinamiento: "Aleatorio" | "Elección Padrino";
-  estado_apadrinamiento_registro: "Activo" | "Finalizado";
+  estado_apadrinamiento_registro: "Activo" | "Finalizado" | "Entregado";
   entregas_ids: string[]; // FKs to Entrega
   ubicacion_entrega_lat?: number;
   ubicacion_entrega_lng?: number;
   direccion_entrega?: string;
+  id_punto_entrega?: string; // FK to PuntoEntrega
 }
 
 export interface Entrega {
@@ -194,6 +195,10 @@ const MOCK_APADRINAMIENTOS: Apadrinamiento[] = [
     tipo_apadrinamiento: "Elección Padrino",
     estado_apadrinamiento_registro: "Activo",
     entregas_ids: ["E001", "E002"],
+    ubicacion_entrega_lat: 21.8853,
+    ubicacion_entrega_lng: -102.2916,
+    direccion_entrega: "Calle Norte 45, Centro, Aguascalientes",
+    id_punto_entrega: "PE001",
   },
   {
     id_apadrinamiento: "AP002",
@@ -203,6 +208,10 @@ const MOCK_APADRINAMIENTOS: Apadrinamiento[] = [
     tipo_apadrinamiento: "Aleatorio",
     estado_apadrinamiento_registro: "Activo",
     entregas_ids: ["E003"],
+    ubicacion_entrega_lat: 21.8700,
+    ubicacion_entrega_lng: -102.2900,
+    direccion_entrega: "Av. Sur 123, Aguascalientes",
+    id_punto_entrega: "PE002",
   },
   {
     id_apadrinamiento: "AP003",

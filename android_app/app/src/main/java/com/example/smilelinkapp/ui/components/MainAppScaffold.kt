@@ -38,7 +38,7 @@ fun MainAppScaffold() {
     val showBottomBar = currentDestination?.route in listOf(
         Screen.Home.route,
         Screen.MyChildren.route,
-        Screen.Map.route,
+        Screen.Deliveries.route,
         Screen.Profile.route
     )
     

@@ -89,10 +89,22 @@ data class Apadrinamiento(
     val tipoApadrinamiento: String, // "Aleatorio" or "Elección Padrino"
     
     @SerializedName("estado_apadrinamiento_registro")
-    val estadoApadrinamientoRegistro: String = "Activo", // "Activo" or "Finalizado"
+    val estadoApadrinamientoRegistro: String = "Activo", // "Activo", "Finalizado", "Entregado"
     
     @SerializedName("entregas_ids")
-    val entregasIds: List<String> = emptyList()
+    val entregasIds: List<String> = emptyList(),
+    
+    @SerializedName("ubicacion_entrega_lat")
+    val ubicacionEntregaLat: Double? = null,
+    
+    @SerializedName("ubicacion_entrega_lng")
+    val ubicacionEntregaLng: Double? = null,
+    
+    @SerializedName("direccion_entrega")
+    val direccionEntrega: String? = null,
+    
+    @SerializedName("id_punto_entrega")
+    val idPuntoEntrega: String? = null
 )
 
 /**

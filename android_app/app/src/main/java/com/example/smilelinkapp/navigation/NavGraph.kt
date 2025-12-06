@@ -10,7 +10,7 @@ import com.example.smilelinkapp.ui.screens.auth.LoginScreen
 import com.example.smilelinkapp.ui.screens.auth.RegisterScreen
 import com.example.smilelinkapp.ui.screens.detail.ChildDetailScreen
 import com.example.smilelinkapp.ui.screens.home.HomeScreen
-import com.example.smilelinkapp.ui.screens.map.MapScreen
+import com.example.smilelinkapp.ui.screens.deliveries.DeliveriesScreen
 import com.example.smilelinkapp.ui.screens.mychildren.MyChildrenScreen
 import com.example.smilelinkapp.ui.screens.onboarding.OnboardingScreen
 import com.example.smilelinkapp.ui.screens.profile.ProfileScreen
@@ -104,9 +104,9 @@ fun SmileLinkNavGraph(
             )
         }
         
-        // Delivery Map
-        composable(Screen.Map.route) {
-            MapScreen()
+        // Deliveries
+        composable(Screen.Deliveries.route) {
+            DeliveriesScreen()
         }
         
         // Profile

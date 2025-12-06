@@ -27,8 +27,12 @@ SmileLink Data Models (JSON Schema)Architecture Note: The system uses a Distribu
   "fecha_inicio": "2025-11-01",      // Date
   "fecha_fin": null,                 // Date (Nullable)
   "tipo_apadrinamiento": "Elección Padrino", // String (e.g., "Aleatorio", "Elección")
-  "estado_apadrinamiento_registro": "Activo", // String (e.g., "Activo", "Finalizado")
-  "entregas_ids": ["E001", "E002"]   // List<String> (FKs to Entrega)
+  "estado_apadrinamiento_registro": "Activo", // String (e.g., "Activo", "Finalizado", "Entregado")
+  "entregas_ids": ["E001", "E002"],  // List<String> (FKs to Entrega)
+  "ubicacion_entrega_lat": 21.8853,  // Decimal (Float, Nullable)
+  "ubicacion_entrega_lng": -102.2916, // Decimal (Float, Nullable)
+  "direccion_entrega": "Calle Norte 45, Centro", // String (Nullable)
+  "id_punto_entrega": "PE001"        // FK to PuntoEntrega (Nullable)
 }
 4. Entrega (Delivery)File Path: entregas/{id_entrega}.json.encDescription: Tracking of gifts delivered.{
   "id_entrega": "E001",              // PK, String

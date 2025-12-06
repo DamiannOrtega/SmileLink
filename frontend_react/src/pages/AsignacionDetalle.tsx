@@ -6,14 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ApadrinamientosService,
   NinosService,
   PadrinosService,
+  PuntosEntregaService,
   Apadrinamiento,
   Nino,
-  Padrino
+  Padrino,
+  PuntoEntrega
 } from "@/services/api";
-import { Pencil, ArrowLeft, User, Heart, Calendar, MapPin } from "lucide-react";
+import { Pencil, ArrowLeft, User, Heart, Calendar, MapPin, Save } from "lucide-react";
 import { toast } from "sonner";
 import LeafletMapComponent from "@/components/LeafletMapComponent";
 
@@ -25,6 +34,9 @@ export default function AsignacionDetalle() {
   const [asignacion, setAsignacion] = useState<Apadrinamiento | null>(null);
   const [nino, setNino] = useState<Nino | null>(null);
   const [padrino, setPadrino] = useState<Padrino | null>(null);
+  const [ubicaciones, setUbicaciones] = useState<PuntoEntrega[]>([]);
+  const [selectedUbicacion, setSelectedUbicacion] = useState<string>("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -35,12 +47,18 @@ export default function AsignacionDetalle() {
   const loadData = async (apadrinamientoId: string) => {
     try {
       setLoading(true);
-      const data = await ApadrinamientosService.getById(apadrinamientoId);
+      const [data, ubicacionesData] = await Promise.all([
+        ApadrinamientosService.getById(apadrinamientoId),
+        PuntosEntregaService.getActivos()
+      ]);
+      
       if (!data) {
         setAsignacion(null);
         return;
       }
       setAsignacion(data);
+      setUbicaciones(ubicacionesData);
+      setSelectedUbicacion(data.id_punto_entrega || "");
 
       // Fetch related entities
       if (data.id_nino) {
@@ -56,6 +74,36 @@ export default function AsignacionDetalle() {
       toast.error("Error al cargar la asignación");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveUbicacion = async () => {
+    if (!asignacion || !selectedUbicacion) {
+      toast.error("Por favor selecciona una ubicación");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const ubicacionSeleccionada = ubicaciones.find(u => u.id_punto_entrega === selectedUbicacion);
+      
+      await ApadrinamientosService.update(asignacion.id_apadrinamiento, {
+        id_punto_entrega: selectedUbicacion,
+        ubicacion_entrega_lat: ubicacionSeleccionada?.latitud,
+        ubicacion_entrega_lng: ubicacionSeleccionada?.longitud,
+        direccion_entrega: ubicacionSeleccionada?.direccion_fisica
+      });
+
+      toast.success("Ubicación de entrega guardada correctamente");
+      // Reload data to reflect changes
+      if (id) {
+        await loadData(id);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Error al guardar la ubicación");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -207,9 +255,31 @@ export default function AsignacionDetalle() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">Ubicación Asignada</p>
+            <div className="flex gap-2">
+              <Select value={selectedUbicacion} onValueChange={setSelectedUbicacion}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecciona una ubicación de entrega" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ubicaciones.map((ubicacion) => (
+                    <SelectItem key={ubicacion.id_punto_entrega} value={ubicacion.id_punto_entrega}>
+                      {ubicacion.nombre_punto} - {ubicacion.direccion_fisica}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleSaveUbicacion} disabled={saving || !selectedUbicacion}>
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Guardando..." : "Guardar"}
+              </Button>
+            </div>
+          </div>
+
           {asignacion.direccion_entrega && (
             <div>
-              <p className="text-sm text-muted-foreground">Dirección</p>
+              <p className="text-sm text-muted-foreground">Dirección Actual</p>
               <p className="font-medium">{asignacion.direccion_entrega}</p>
             </div>
           )}
@@ -224,7 +294,7 @@ export default function AsignacionDetalle() {
             />
           ) : (
             <div className="p-4 bg-muted/50 rounded-md text-center text-muted-foreground">
-              No hay ubicación de mapa registrada.
+              No hay ubicación de mapa registrada. Selecciona una ubicación arriba.
             </div>
           )}
         </CardContent>

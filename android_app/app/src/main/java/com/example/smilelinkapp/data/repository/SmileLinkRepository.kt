@@ -158,6 +158,24 @@ class SmileLinkRepository {
         }
     }
     
+    suspend fun updateApadrinamiento(id: String, apadrinamiento: Apadrinamiento): Result<Apadrinamiento> {
+        return if (AppConfig.USE_MOCK) {
+            delay(500)
+            Result.success(apadrinamiento)
+        } else {
+            try {
+                val response = apiService.updateApadrinamiento(id, apadrinamiento)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else {
+                    Result.failure(Exception("Error: ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+    
     // ===== ENTREGAS (Deliveries) =====
     
     suspend fun getEntregasForApadrinamiento(apadrinamientoId: String): Result<List<Entrega>> {

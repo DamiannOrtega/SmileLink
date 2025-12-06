@@ -81,7 +81,11 @@ object MockDataProvider {
             fechaInicio = "2024-01-15",
             tipoApadrinamiento = "Elección Padrino",
             estadoApadrinamientoRegistro = "Activo",
-            entregasIds = listOf("E001")
+            entregasIds = listOf("E001"),
+            ubicacionEntregaLat = 19.4326,
+            ubicacionEntregaLng = -99.1332,
+            direccionEntrega = "Av. Reforma 456, Col. Centro",
+            idPuntoEntrega = "PE001"
         )
     )
     
