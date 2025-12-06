@@ -14,9 +14,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, MapPin } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PuntosEntregaService } from "@/services/api";
+import LeafletMapComponent from "@/components/LeafletMapComponent";
 
 export default function UbicacionNueva() {
   const navigate = useNavigate();
@@ -35,6 +36,10 @@ export default function UbicacionNueva() {
     estado_punto: "Activo" as "Activo" | "Inactivo",
   });
 
+  // Coordenadas para el mapa (centro de Aguascalientes por defecto)
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 21.8853, lng: -102.2916 });
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
+
   useEffect(() => {
     if (isEditing && id) {
       loadUbicacion(id);
@@ -46,15 +51,20 @@ export default function UbicacionNueva() {
       setLoading(true);
       const ubicacion = await PuntosEntregaService.getById(ubicacionId);
       if (ubicacion) {
+        const lat = ubicacion.latitud;
+        const lng = ubicacion.longitud;
         setFormData({
           nombre_punto: ubicacion.nombre_punto,
           direccion_fisica: ubicacion.direccion_fisica,
-          latitud: ubicacion.latitud.toString(),
-          longitud: ubicacion.longitud.toString(),
+          latitud: lat.toString(),
+          longitud: lng.toString(),
           horario_atencion: ubicacion.horario_atencion || "",
           contacto_referencia: ubicacion.contacto_referencia || "",
           estado_punto: ubicacion.estado_punto,
         });
+        // Establecer posición en el mapa
+        setMapCenter({ lat, lng });
+        setSelectedLocation({ lat, lng });
       }
     } catch (err) {
       toast.error("Error al cargar la ubicación");
@@ -87,7 +97,7 @@ export default function UbicacionNueva() {
     const lng = parseFloat(formData.longitud);
 
     if (isNaN(lat) || isNaN(lng)) {
-      toast.error("Las coordenadas deben ser números válidos");
+      toast.error("Por favor selecciona una ubicación en el mapa");
       return;
     }
 
@@ -188,38 +198,61 @@ export default function UbicacionNueva() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="latitud">
-                  Latitud <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="latitud"
-                  name="latitud"
-                  type="number"
-                  step="any"
-                  value={formData.latitud}
-                  onChange={handleInputChange}
-                  placeholder="Ej: 21.8853"
-                  required
-                />
+            <div className="space-y-2">
+              <Label>
+                Selecciona la ubicación en el mapa <span className="text-destructive">*</span>
+              </Label>
+              <LeafletMapComponent
+                center={mapCenter}
+                selectedLocation={selectedLocation}
+                onLocationSelect={(location) => {
+                  setSelectedLocation(location);
+                  setFormData((prev) => ({
+                    ...prev,
+                    latitud: location.lat.toFixed(6),
+                    longitud: location.lng.toFixed(6),
+                  }));
+                  toast.success(`Coordenadas seleccionadas: ${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`);
+                }}
+                interactive={true}
+                height="400px"
+              />
+              <div className="grid grid-cols-2 gap-4 mt-2">
+                <div className="space-y-1">
+                  <Label htmlFor="latitud" className="text-sm text-muted-foreground">
+                    Latitud
+                  </Label>
+                  <Input
+                    id="latitud"
+                    name="latitud"
+                    type="text"
+                    value={formData.latitud}
+                    onChange={handleInputChange}
+                    placeholder="Selecciona en el mapa"
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="longitud" className="text-sm text-muted-foreground">
+                    Longitud
+                  </Label>
+                  <Input
+                    id="longitud"
+                    name="longitud"
+                    type="text"
+                    value={formData.longitud}
+                    onChange={handleInputChange}
+                    placeholder="Selecciona en el mapa"
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="longitud">
-                  Longitud <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="longitud"
-                  name="longitud"
-                  type="number"
-                  step="any"
-                  value={formData.longitud}
-                  onChange={handleInputChange}
-                  placeholder="Ej: -102.2916"
-                  required
-                />
-              </div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                Haz clic en el mapa para seleccionar la ubicación
+              </p>
             </div>
 
             <div className="space-y-2">

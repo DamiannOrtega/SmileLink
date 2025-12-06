@@ -3,12 +3,9 @@ import {
   Users, 
   Heart, 
   Link2, 
-  Mail, 
-  Gift, 
   Package, 
   MapPin, 
   Calendar,
-  Shield,
   Settings
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
@@ -30,11 +27,9 @@ const menuItems = [
   { title: "Niños", url: "/ninos", icon: Users },
   { title: "Padrinos", url: "/padrinos", icon: Heart },
   { title: "Asignaciones", url: "/asignaciones", icon: Link2 },
-  { title: "Regalos", url: "/regalos", icon: Gift },
   { title: "Entregas", url: "/entregas", icon: Package },
   { title: "Ubicaciones", url: "/ubicaciones", icon: MapPin },
   { title: "Eventos", url: "/eventos", icon: Calendar },
-  { title: "Usuarios", url: "/usuarios", icon: Shield },
   { title: "Configuración", url: "/configuracion", icon: Settings },
 ];
 
