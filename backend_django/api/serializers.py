@@ -20,6 +20,7 @@ class NinoSerializer(serializers.Serializer):
         default='Disponible'
     )
     fecha_apadrinamiento_actual = serializers.DateField(required=False, allow_null=True)
+    avatar_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class PadrinoSerializer(serializers.Serializer):
