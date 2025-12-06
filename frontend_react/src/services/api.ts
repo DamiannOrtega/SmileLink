@@ -34,6 +34,7 @@ export interface Nino {
   id_padrino_actual?: string; // FK to Padrino (Nullable)
   estado_apadrinamiento: "Disponible" | "Apadrinado";
   fecha_apadrinamiento_actual?: string; // Date (Nullable)
+  avatar_url?: string;
 }
 
 export interface Apadrinamiento {
@@ -490,7 +491,7 @@ export const NinosService = {
       await delay();
       const index = MOCK_NINOS.findIndex((n) => n.id_nino === id);
       if (index !== -1) MOCK_NINOS.splice(index, 1);
-      
+
       // Eliminar asignaciones huérfanas (sin niño válido)
       const asignacionesHuérfanas = MOCK_APADRINAMIENTOS.filter(
         (a) => a.id_nino === id
@@ -503,10 +504,27 @@ export const NinosService = {
           MOCK_APADRINAMIENTOS.splice(indexAsig, 1);
         }
       });
-      
+
       return;
     }
     return fetchAPI<void>(`/ninos/${id}/`, { method: "DELETE" });
+  },
+
+  async uploadAvatar(id: string, file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Usamos fetch directo para poder enviar FormData (fetchAPI asume JSON)
+    // Aseguramos que se usa la IP correcta y no localhost
+    const response = await fetch(`${API_BASE_URL}/ninos/${id}/upload_avatar/`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Error uploading avatar");
+    }
+    return response.json();
   },
 };
 
@@ -565,7 +583,7 @@ export const PadrinosService = {
       await delay();
       const index = MOCK_PADRINOS.findIndex((p) => p.id_padrino === id);
       if (index !== -1) MOCK_PADRINOS.splice(index, 1);
-      
+
       // Eliminar asignaciones huérfanas (sin padrino válido)
       const asignacionesHuérfanas = MOCK_APADRINAMIENTOS.filter(
         (a) => a.id_padrino === id
@@ -578,7 +596,7 @@ export const PadrinosService = {
           MOCK_APADRINAMIENTOS.splice(indexAsig, 1);
         }
       });
-      
+
       return;
     }
     return fetchAPI<void>(`/padrinos/${id}/`, { method: "DELETE" });
@@ -999,7 +1017,7 @@ export const EventosService = {
     // Si no es mock, buscar en localStorage primero (para eventos creados recientemente)
     // y luego en la API
     let evento: Evento | null = null;
-    
+
     // Buscar primero en localStorage
     try {
       const saved = localStorage.getItem("api_eventos");
@@ -1014,7 +1032,7 @@ export const EventosService = {
     } catch (localError) {
       console.warn("Error al buscar evento en localStorage:", localError);
     }
-    
+
     // Si no se encuentra en localStorage, buscar en la API
     try {
       evento = await fetchAPI<Evento>(`/eventos/${id}/`);
@@ -1045,19 +1063,19 @@ export const EventosService = {
       } catch (e) {
         console.warn("Error al cargar eventos de localStorage:", e);
       }
-      
+
       // Calcular el siguiente ID basado en el máximo ID existente
-      const maxId = allEventos.length > 0 
+      const maxId = allEventos.length > 0
         ? Math.max(...allEventos.map(e => parseInt(e.id_evento.replace("EV", "")) || 0))
         : 0;
       const newEvento: Evento = {
         id_evento: `EV${String(maxId + 1).padStart(3, "0")}`,
         ...data,
       };
-      
+
       // Agregar al array inicial
       MOCK_EVENTOS.push(newEvento);
-      
+
       // Actualizar localStorage con todos los eventos
       try {
         const eventosParaGuardar = [...MOCK_EVENTOS];
@@ -1099,7 +1117,7 @@ export const EventosService = {
       const index = MOCK_EVENTOS.findIndex((e) => e.id_evento === id);
       if (index === -1) throw new Error("Evento no encontrado");
       MOCK_EVENTOS[index] = { ...MOCK_EVENTOS[index], ...data };
-      
+
       // Actualizar localStorage
       try {
         const eventosParaGuardar = [...MOCK_EVENTOS];
@@ -1116,7 +1134,7 @@ export const EventosService = {
       } catch (e) {
         console.warn("No se pudo actualizar eventos en localStorage:", e);
       }
-      
+
       return MOCK_EVENTOS[index];
     }
     // Si no es mock, usar API real pero también actualizar localStorage
@@ -1124,7 +1142,7 @@ export const EventosService = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
-    
+
     // Actualizar en localStorage
     try {
       const saved = localStorage.getItem("api_eventos");
@@ -1141,7 +1159,7 @@ export const EventosService = {
     } catch (e) {
       console.warn("No se pudo actualizar evento en localStorage:", e);
     }
-    
+
     return eventoActualizado;
   },
 
@@ -1150,7 +1168,7 @@ export const EventosService = {
       await delay();
       const index = MOCK_EVENTOS.findIndex((e) => e.id_evento === id);
       if (index !== -1) MOCK_EVENTOS.splice(index, 1);
-      
+
       // Eliminar también de localStorage
       try {
         const saved = localStorage.getItem("mock_eventos");
@@ -1162,12 +1180,12 @@ export const EventosService = {
       } catch (e) {
         console.warn("Error al eliminar evento de localStorage:", e);
       }
-      
+
       return;
     }
     // Si no es mock, eliminar de la API y también de localStorage
     await fetchAPI<void>(`/eventos/${id}/`, { method: "DELETE" });
-    
+
     // Eliminar también de localStorage
     try {
       const saved = localStorage.getItem("api_eventos");
