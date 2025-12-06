@@ -99,6 +99,31 @@ fun MyChildrenScreen(
     }
 }
 
+// Helper to resolve avatar URL
+private fun resolveAvatarUrl(url: String?, childName: String): String {
+    if (url.isNullOrEmpty()) {
+        val encodedName = java.net.URLEncoder.encode(childName, "UTF-8")
+        return "https://ui-avatars.com/api/?name=$encodedName&size=512&background=7FD8BE&color=fff"
+    }
+    
+    // Replace localhost or 127.0.0.1 with the backend IP accessible from Android
+    var resolvedUrl = url
+    if (url.contains("localhost") || url.contains("127.0.0.1")) {
+        resolvedUrl = url.replace("localhost", "192.168.193.177")
+                         .replace("127.0.0.1", "192.168.193.177")
+    }
+    
+    // If it's a relative path (e.g. /media/...), append base URL
+    if (resolvedUrl.startsWith("/")) {
+        resolvedUrl = "http://192.168.193.177:8000$resolvedUrl"
+    } else if (!resolvedUrl.startsWith("http")) {
+         // Assume relative if not starting with http
+         resolvedUrl = "http://192.168.193.177:8000/$resolvedUrl"
+    }
+    
+    return resolvedUrl
+}
+
 @Composable
 private fun SponsoredChildCard(
     childInfo: SponsoredChildInfo,
@@ -121,7 +146,7 @@ private fun SponsoredChildCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AsyncImage(
-                    model = "https://ui-avatars.com/api/?name=${childInfo.nino.nombre}&size=128&background=7FD8BE&color=fff",
+                    model = resolveAvatarUrl(childInfo.nino.avatarUrl, childInfo.nino.nombre),
                     contentDescription = "Foto de ${childInfo.nino.nombre}",
                     modifier = Modifier
                         .size(64.dp)

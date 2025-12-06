@@ -92,6 +92,31 @@ fun ChildDetailScreen(
     }
 }
 
+// Helper to resolve avatar URL
+private fun resolveAvatarUrl(url: String?, childName: String): String {
+    if (url.isNullOrEmpty()) {
+        val encodedName = java.net.URLEncoder.encode(childName, "UTF-8")
+        return "https://ui-avatars.com/api/?name=$encodedName&size=512&background=7FD8BE&color=fff"
+    }
+    
+    // Replace localhost or 127.0.0.1 with the backend IP accessible from Android
+    var resolvedUrl = url
+    if (url.contains("localhost") || url.contains("127.0.0.1")) {
+        resolvedUrl = url.replace("localhost", "192.168.193.177")
+                         .replace("127.0.0.1", "192.168.193.177")
+    }
+    
+    // If it's a relative path (e.g. /media/...), append base URL
+    if (resolvedUrl.startsWith("/")) {
+        resolvedUrl = "http://192.168.193.177:8000$resolvedUrl"
+    } else if (!resolvedUrl.startsWith("http")) {
+         // Assume relative if not starting with http
+         resolvedUrl = "http://192.168.193.177:8000/$resolvedUrl"
+    }
+    
+    return resolvedUrl
+}
+
 @Composable
 private fun ChildDetailContent(
     nino: Nino,
@@ -114,7 +139,7 @@ private fun ChildDetailContent(
                     .height(300.dp)
             ) {
                 AsyncImage(
-                    model = "https://ui-avatars.com/api/?name=${nino.nombre}&size=512&background=7FD8BE&color=fff",
+                    model = resolveAvatarUrl(nino.avatarUrl, nino.nombre),
                     contentDescription = "Foto de ${nino.nombre}",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

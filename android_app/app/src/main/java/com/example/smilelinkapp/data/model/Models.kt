@@ -31,7 +31,10 @@ data class Nino(
     val estadoApadrinamiento: String = "Disponible", // "Disponible" or "Apadrinado"
     
     @SerializedName("fecha_apadrinamiento_actual")
-    val fechaApadrinamientoActual: String? = null
+    val fechaApadrinamientoActual: String? = null,
+    
+    @SerializedName("avatar_url")
+    val avatarUrl: String? = null
 )
 
 /**
