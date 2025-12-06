@@ -20,7 +20,7 @@ import { EventosService } from "@/services/api";
 
 export default function EventoNuevo() {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { id } = useParams<{ id?: string }>();
   const isEditing = Boolean(id);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(isEditing);
@@ -36,13 +36,18 @@ export default function EventoNuevo() {
   useEffect(() => {
     if (isEditing && id) {
       loadEvento(id);
+    } else {
+      // Si no está editando, asegurar que loading sea false
+      setLoading(false);
     }
   }, [isEditing, id]);
 
   const loadEvento = async (eventoId: string) => {
     try {
       setLoading(true);
+      console.log("Cargando evento con ID:", eventoId);
       const evento = await EventosService.getById(eventoId);
+      console.log("Evento encontrado:", evento);
       if (evento) {
         setFormData({
           nombre_evento: evento.nombre_evento,
@@ -51,8 +56,20 @@ export default function EventoNuevo() {
           fecha_fin: evento.fecha_fin,
           descripcion: evento.descripcion || "",
         });
+        console.log("FormData actualizado:", {
+          nombre_evento: evento.nombre_evento,
+          tipo_evento: evento.tipo_evento,
+          fecha_inicio: evento.fecha_inicio,
+          fecha_fin: evento.fecha_fin,
+          descripcion: evento.descripcion || "",
+        });
+      } else {
+        console.warn("Evento no encontrado con ID:", eventoId);
+        toast.error("Evento no encontrado");
+        navigate("/eventos");
       }
     } catch (err) {
+      console.error("Error al cargar el evento:", err);
       toast.error("Error al cargar el evento");
     } finally {
       setLoading(false);
@@ -103,7 +120,8 @@ export default function EventoNuevo() {
         });
 
         toast.success(`Evento ${eventoActualizado.nombre_evento} actualizado exitosamente`);
-        navigate(`/eventos`);
+        // Forzar recarga navegando con un timestamp
+        navigate(`/eventos?refresh=${Date.now()}`);
       } else {
         // Crear nuevo evento
         const nuevoEvento = await EventosService.create({

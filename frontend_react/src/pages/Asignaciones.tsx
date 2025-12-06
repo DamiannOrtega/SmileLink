@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Search, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ import {
 
 export default function Asignaciones() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [asignaciones, setAsignaciones] = useState<Apadrinamiento[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,7 +35,7 @@ export default function Asignaciones() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [location.pathname]);
 
   const loadData = async () => {
     try {
@@ -44,7 +46,16 @@ export default function Asignaciones() {
         PadrinosService.getAll()
       ]);
 
-      setAsignaciones(asignacionesData);
+      // Crear sets de IDs válidos para filtrar asignaciones huérfanas
+      const ninosIds = new Set(ninosData.map(n => n.id_nino));
+      const padrinosIds = new Set(padrinosData.map(p => p.id_padrino));
+      
+      // Filtrar asignaciones que tienen niño y padrino válidos
+      const asignacionesValidas = asignacionesData.filter(
+        (asig) => ninosIds.has(asig.id_nino) && padrinosIds.has(asig.id_padrino)
+      );
+
+      setAsignaciones(asignacionesValidas);
       setNinosMap(new Map(ninosData.map(n => [n.id_nino, n.nombre])));
       setPadrinosMap(new Map(padrinosData.map(p => [p.id_padrino, p.nombre])));
     } catch (err) {

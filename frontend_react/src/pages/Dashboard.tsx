@@ -43,12 +43,20 @@ export default function Dashboard() {
     loadDashboardData();
     checkNotifications();
     
+    // Recargar dashboard periódicamente
+    const dashboardInterval = setInterval(() => {
+      loadDashboardData();
+    }, 30000); // Cada 30 segundos
+    
     // Verificar notificaciones periódicamente
-    const interval = setInterval(() => {
+    const notificationInterval = setInterval(() => {
       checkNotifications();
     }, 60000); // Cada minuto
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(dashboardInterval);
+      clearInterval(notificationInterval);
+    };
   }, [location.pathname]);
 
   const checkNotifications = async () => {
@@ -132,19 +140,27 @@ export default function Dashboard() {
       );
       setEventos(eventosActivos);
 
-      // Cargar últimas asignaciones
-      const asignacionesData = await ApadrinamientosService.getAll();
-      const ultimasAsigs = asignacionesData
-        .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())
-        .slice(0, 5);
-      setAsignaciones(ultimasAsigs);
-
-      // Cargar catálogos para nombres
+      // Cargar catálogos para nombres primero
       const ninosData = await NinosService.getAll();
       const padrinosData = await PadrinosService.getAll();
 
       setNinosMap(new Map(ninosData.map(n => [n.id_nino, n.nombre])));
       setPadrinosMap(new Map(padrinosData.map(p => [p.id_padrino, p.nombre])));
+
+      // Cargar últimas asignaciones y filtrar huérfanas
+      const asignacionesData = await ApadrinamientosService.getAll();
+      const ninosIds = new Set(ninosData.map(n => n.id_nino));
+      const padrinosIds = new Set(padrinosData.map(p => p.id_padrino));
+      
+      // Filtrar asignaciones que tienen niño y padrino válidos
+      const asignacionesValidas = asignacionesData.filter(
+        (asig) => ninosIds.has(asig.id_nino) && padrinosIds.has(asig.id_padrino)
+      );
+      
+      const ultimasAsigs = asignacionesValidas
+        .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime())
+        .slice(0, 5);
+      setAsignaciones(ultimasAsigs);
     } catch (err) {
       console.error("Error loading dashboard:", err);
     } finally {

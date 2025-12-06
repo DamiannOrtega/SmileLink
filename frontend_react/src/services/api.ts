@@ -490,6 +490,20 @@ export const NinosService = {
       await delay();
       const index = MOCK_NINOS.findIndex((n) => n.id_nino === id);
       if (index !== -1) MOCK_NINOS.splice(index, 1);
+      
+      // Eliminar asignaciones huérfanas (sin niño válido)
+      const asignacionesHuérfanas = MOCK_APADRINAMIENTOS.filter(
+        (a) => a.id_nino === id
+      );
+      asignacionesHuérfanas.forEach((asignacion) => {
+        const indexAsig = MOCK_APADRINAMIENTOS.findIndex(
+          (a) => a.id_apadrinamiento === asignacion.id_apadrinamiento
+        );
+        if (indexAsig !== -1) {
+          MOCK_APADRINAMIENTOS.splice(indexAsig, 1);
+        }
+      });
+      
       return;
     }
     return fetchAPI<void>(`/ninos/${id}/`, { method: "DELETE" });
@@ -551,6 +565,20 @@ export const PadrinosService = {
       await delay();
       const index = MOCK_PADRINOS.findIndex((p) => p.id_padrino === id);
       if (index !== -1) MOCK_PADRINOS.splice(index, 1);
+      
+      // Eliminar asignaciones huérfanas (sin padrino válido)
+      const asignacionesHuérfanas = MOCK_APADRINAMIENTOS.filter(
+        (a) => a.id_padrino === id
+      );
+      asignacionesHuérfanas.forEach((asignacion) => {
+        const indexAsig = MOCK_APADRINAMIENTOS.findIndex(
+          (a) => a.id_apadrinamiento === asignacion.id_apadrinamiento
+        );
+        if (indexAsig !== -1) {
+          MOCK_APADRINAMIENTOS.splice(indexAsig, 1);
+        }
+      });
+      
       return;
     }
     return fetchAPI<void>(`/padrinos/${id}/`, { method: "DELETE" });
@@ -909,60 +937,160 @@ export const EventosService = {
   async getAll(): Promise<Evento[]> {
     if (USE_MOCK) {
       await delay();
-      // Intentar cargar eventos guardados en localStorage
+      // Cargar eventos guardados en localStorage y combinarlos con los iniciales
+      const allEventos = [...MOCK_EVENTOS];
       try {
         const saved = localStorage.getItem("mock_eventos");
         if (saved) {
           const parsed = JSON.parse(saved) as Evento[];
-          // Combinar con los eventos iniciales, evitando duplicados
-          const allEventos = [...MOCK_EVENTOS];
           parsed.forEach(evento => {
             if (!allEventos.find(e => e.id_evento === evento.id_evento)) {
               allEventos.push(evento);
             }
           });
-          return [...allEventos];
         }
       } catch (e) {
         console.warn("Error al cargar eventos de localStorage:", e);
       }
-      return [...MOCK_EVENTOS];
+      return [...allEventos];
     }
-    return fetchAPI<Evento[]>("/eventos/");
+    // Si no es mock, usar API real pero también cargar de localStorage como respaldo
+    const apiEventos = await fetchAPI<Evento[]>("/eventos/");
+    try {
+      const saved = localStorage.getItem("api_eventos");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Evento[];
+        // Combinar eventos de API con los de localStorage, evitando duplicados
+        const allEventos = [...apiEventos];
+        parsed.forEach(evento => {
+          if (!allEventos.find(e => e.id_evento === evento.id_evento)) {
+            allEventos.push(evento);
+          }
+        });
+        return allEventos;
+      }
+    } catch (e) {
+      console.warn("Error al cargar eventos de localStorage:", e);
+    }
+    return apiEventos;
   },
 
   async getById(id: string): Promise<Evento | null> {
+    console.log("getById llamado con ID:", id, "USE_MOCK:", USE_MOCK);
     if (USE_MOCK) {
       await delay();
-      return MOCK_EVENTOS.find((e) => e.id_evento === id) || null;
+      // Buscar en MOCK_EVENTOS y localStorage
+      let evento = MOCK_EVENTOS.find((e) => e.id_evento === id) || null;
+      console.log("Evento encontrado en MOCK_EVENTOS:", evento);
+      if (!evento) {
+        try {
+          const saved = localStorage.getItem("mock_eventos");
+          if (saved) {
+            const parsed = JSON.parse(saved) as Evento[];
+            evento = parsed.find((e) => e.id_evento === id) || null;
+            console.log("Evento encontrado en localStorage (mock):", evento);
+          }
+        } catch (e) {
+          console.warn("Error al buscar evento en localStorage:", e);
+        }
+      }
+      return evento;
     }
-    return fetchAPI<Evento>(`/eventos/${id}/`);
+    // Si no es mock, buscar en localStorage primero (para eventos creados recientemente)
+    // y luego en la API
+    let evento: Evento | null = null;
+    
+    // Buscar primero en localStorage
+    try {
+      const saved = localStorage.getItem("api_eventos");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Evento[];
+        evento = parsed.find((e) => e.id_evento === id) || null;
+        if (evento) {
+          console.log("Evento encontrado en localStorage (api):", evento);
+          return evento;
+        }
+      }
+    } catch (localError) {
+      console.warn("Error al buscar evento en localStorage:", localError);
+    }
+    
+    // Si no se encuentra en localStorage, buscar en la API
+    try {
+      evento = await fetchAPI<Evento>(`/eventos/${id}/`);
+      console.log("Evento encontrado en API:", evento);
+      return evento;
+    } catch (e) {
+      console.log("Error al buscar en API:", e);
+      // Si la API falla y no se encontró en localStorage, retornar null
+      return null;
+    }
   },
 
   async create(data: Omit<Evento, "id_evento">): Promise<Evento> {
     if (USE_MOCK) {
       await delay();
+      // Obtener todos los eventos (iniciales + localStorage) para calcular el siguiente ID
+      const allEventos = [...MOCK_EVENTOS];
+      try {
+        const saved = localStorage.getItem("mock_eventos");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Evento[];
+          parsed.forEach(evento => {
+            if (!allEventos.find(e => e.id_evento === evento.id_evento)) {
+              allEventos.push(evento);
+            }
+          });
+        }
+      } catch (e) {
+        console.warn("Error al cargar eventos de localStorage:", e);
+      }
+      
       // Calcular el siguiente ID basado en el máximo ID existente
-      const maxId = MOCK_EVENTOS.length > 0 
-        ? Math.max(...MOCK_EVENTOS.map(e => parseInt(e.id_evento.replace("EV", "")) || 0))
+      const maxId = allEventos.length > 0 
+        ? Math.max(...allEventos.map(e => parseInt(e.id_evento.replace("EV", "")) || 0))
         : 0;
       const newEvento: Evento = {
         id_evento: `EV${String(maxId + 1).padStart(3, "0")}`,
         ...data,
       };
+      
+      // Agregar al array inicial
       MOCK_EVENTOS.push(newEvento);
-      // Persistir en localStorage para que persista durante la sesión
+      
+      // Actualizar localStorage con todos los eventos
       try {
-        localStorage.setItem("mock_eventos", JSON.stringify(MOCK_EVENTOS));
+        const eventosParaGuardar = [...MOCK_EVENTOS];
+        const saved = localStorage.getItem("mock_eventos");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Evento[];
+          parsed.forEach(evento => {
+            if (!eventosParaGuardar.find(e => e.id_evento === evento.id_evento)) {
+              eventosParaGuardar.push(evento);
+            }
+          });
+        }
+        localStorage.setItem("mock_eventos", JSON.stringify(eventosParaGuardar));
       } catch (e) {
         console.warn("No se pudo guardar eventos en localStorage:", e);
       }
       return newEvento;
     }
-    return fetchAPI<Evento>("/eventos/", {
+    // Si no es mock, usar API real pero también guardar en localStorage como respaldo
+    const newEvento = await fetchAPI<Evento>("/eventos/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    // Guardar en localStorage para que persista
+    try {
+      const saved = localStorage.getItem("api_eventos");
+      const eventos = saved ? JSON.parse(saved) as Evento[] : [];
+      eventos.push(newEvento);
+      localStorage.setItem("api_eventos", JSON.stringify(eventos));
+    } catch (e) {
+      console.warn("No se pudo guardar evento en localStorage:", e);
+    }
+    return newEvento;
   },
 
   async update(id: string, data: Partial<Evento>): Promise<Evento> {
@@ -971,12 +1099,50 @@ export const EventosService = {
       const index = MOCK_EVENTOS.findIndex((e) => e.id_evento === id);
       if (index === -1) throw new Error("Evento no encontrado");
       MOCK_EVENTOS[index] = { ...MOCK_EVENTOS[index], ...data };
+      
+      // Actualizar localStorage
+      try {
+        const eventosParaGuardar = [...MOCK_EVENTOS];
+        const saved = localStorage.getItem("mock_eventos");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Evento[];
+          parsed.forEach(evento => {
+            if (!eventosParaGuardar.find(e => e.id_evento === evento.id_evento)) {
+              eventosParaGuardar.push(evento);
+            }
+          });
+        }
+        localStorage.setItem("mock_eventos", JSON.stringify(eventosParaGuardar));
+      } catch (e) {
+        console.warn("No se pudo actualizar eventos en localStorage:", e);
+      }
+      
       return MOCK_EVENTOS[index];
     }
-    return fetchAPI<Evento>(`/eventos/${id}/`, {
+    // Si no es mock, usar API real pero también actualizar localStorage
+    const eventoActualizado = await fetchAPI<Evento>(`/eventos/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+    
+    // Actualizar en localStorage
+    try {
+      const saved = localStorage.getItem("api_eventos");
+      if (saved) {
+        const eventos = JSON.parse(saved) as Evento[];
+        const index = eventos.findIndex(e => e.id_evento === id);
+        if (index !== -1) {
+          eventos[index] = { ...eventos[index], ...eventoActualizado };
+        } else {
+          eventos.push(eventoActualizado);
+        }
+        localStorage.setItem("api_eventos", JSON.stringify(eventos));
+      }
+    } catch (e) {
+      console.warn("No se pudo actualizar evento en localStorage:", e);
+    }
+    
+    return eventoActualizado;
   },
 
   async delete(id: string): Promise<void> {
