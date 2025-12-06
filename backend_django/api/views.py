@@ -17,6 +17,16 @@ from .serializers import (
 storage = get_storage_manager()
 sync = get_sync_manager()
 
+def make_serializable(data):
+    """Recursively convert date/datetime objects to ISO strings."""
+    if isinstance(data, dict):
+        return {k: make_serializable(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [make_serializable(v) for v in data]
+    if hasattr(data, 'isoformat'):
+        return data.isoformat()
+    return data
+
 
 class NinosViewSet(viewsets.ViewSet):
     """ViewSet para Niños"""
