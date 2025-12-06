@@ -50,7 +50,7 @@ class ApadrinamientoSerializer(serializers.Serializer):
         default='Elección Padrino'
     )
     estado_apadrinamiento_registro = serializers.ChoiceField(
-        choices=['Activo', 'Finalizado'],
+        choices=['Activo', 'Finalizado', 'Entregado'],
         default='Activo'
     )
     entregas_ids = serializers.ListField(
@@ -61,6 +61,7 @@ class ApadrinamientoSerializer(serializers.Serializer):
     ubicacion_entrega_lat = serializers.FloatField(required=False, allow_null=True)
     ubicacion_entrega_lng = serializers.FloatField(required=False, allow_null=True)
     direccion_entrega = serializers.CharField(required=False, allow_blank=True)
+    id_punto_entrega = serializers.CharField(required=False, allow_null=True)
 
 
 class EntregaSerializer(serializers.Serializer):
