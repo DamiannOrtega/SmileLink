@@ -408,7 +408,27 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  // Para DELETE y otras operaciones que no retornan contenido, retornar void
+  if (response.status === 204 || response.status === 200) {
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      // Respuesta vacía o no JSON
+      return undefined as T;
+    }
+  }
+
+  // Intentar parsear JSON solo si hay contenido
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch (e) {
+    // Si no es JSON válido, retornar undefined para void
+    return undefined as T;
+  }
 }
 
 // ============================================================================
@@ -889,6 +909,23 @@ export const EventosService = {
   async getAll(): Promise<Evento[]> {
     if (USE_MOCK) {
       await delay();
+      // Intentar cargar eventos guardados en localStorage
+      try {
+        const saved = localStorage.getItem("mock_eventos");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Evento[];
+          // Combinar con los eventos iniciales, evitando duplicados
+          const allEventos = [...MOCK_EVENTOS];
+          parsed.forEach(evento => {
+            if (!allEventos.find(e => e.id_evento === evento.id_evento)) {
+              allEventos.push(evento);
+            }
+          });
+          return [...allEventos];
+        }
+      } catch (e) {
+        console.warn("Error al cargar eventos de localStorage:", e);
+      }
       return [...MOCK_EVENTOS];
     }
     return fetchAPI<Evento[]>("/eventos/");
@@ -905,11 +942,21 @@ export const EventosService = {
   async create(data: Omit<Evento, "id_evento">): Promise<Evento> {
     if (USE_MOCK) {
       await delay();
+      // Calcular el siguiente ID basado en el máximo ID existente
+      const maxId = MOCK_EVENTOS.length > 0 
+        ? Math.max(...MOCK_EVENTOS.map(e => parseInt(e.id_evento.replace("EV", "")) || 0))
+        : 0;
       const newEvento: Evento = {
-        id_evento: `EV${String(MOCK_EVENTOS.length + 1).padStart(3, "0")}`,
+        id_evento: `EV${String(maxId + 1).padStart(3, "0")}`,
         ...data,
       };
       MOCK_EVENTOS.push(newEvento);
+      // Persistir en localStorage para que persista durante la sesión
+      try {
+        localStorage.setItem("mock_eventos", JSON.stringify(MOCK_EVENTOS));
+      } catch (e) {
+        console.warn("No se pudo guardar eventos en localStorage:", e);
+      }
       return newEvento;
     }
     return fetchAPI<Evento>("/eventos/", {

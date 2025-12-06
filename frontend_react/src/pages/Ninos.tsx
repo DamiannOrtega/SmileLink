@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Search, Eye, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ import { NinosService, Nino } from "@/services/api";
 
 export default function NinosRefactored() {
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Estados para datos
     const [ninos, setNinos] = useState<Nino[]>([]);
@@ -46,10 +48,10 @@ export default function NinosRefactored() {
     const [ninoToDelete, setNinoToDelete] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
 
-    // ✅ CARGAR DATOS AL MONTAR EL COMPONENTE
+    // ✅ CARGAR DATOS AL MONTAR EL COMPONENTE Y CUANDO SE VUELVE A LA PÁGINA
     useEffect(() => {
         loadNinos();
-    }, []);
+    }, [location.pathname]);
 
     const loadNinos = async () => {
         try {

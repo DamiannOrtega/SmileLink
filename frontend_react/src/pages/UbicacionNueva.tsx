@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +15,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PuntosEntregaService } from "@/services/api";
 
 export default function UbicacionNueva() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(isEditing);
 
   const [formData, setFormData] = useState({
     nombre_punto: "",
@@ -30,6 +34,34 @@ export default function UbicacionNueva() {
     contacto_referencia: "",
     estado_punto: "Activo" as "Activo" | "Inactivo",
   });
+
+  useEffect(() => {
+    if (isEditing && id) {
+      loadUbicacion(id);
+    }
+  }, [isEditing, id]);
+
+  const loadUbicacion = async (ubicacionId: string) => {
+    try {
+      setLoading(true);
+      const ubicacion = await PuntosEntregaService.getById(ubicacionId);
+      if (ubicacion) {
+        setFormData({
+          nombre_punto: ubicacion.nombre_punto,
+          direccion_fisica: ubicacion.direccion_fisica,
+          latitud: ubicacion.latitud.toString(),
+          longitud: ubicacion.longitud.toString(),
+          horario_atencion: ubicacion.horario_atencion || "",
+          contacto_referencia: ubicacion.contacto_referencia || "",
+          estado_punto: ubicacion.estado_punto,
+        });
+      }
+    } catch (err) {
+      toast.error("Error al cargar la ubicación");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -61,34 +93,63 @@ export default function UbicacionNueva() {
 
     try {
       setSubmitting(true);
-      const nuevaUbicacion = await PuntosEntregaService.create({
-        nombre_punto: formData.nombre_punto.trim(),
-        direccion_fisica: formData.direccion_fisica.trim(),
-        latitud: lat,
-        longitud: lng,
-        horario_atencion: formData.horario_atencion.trim(),
-        contacto_referencia: formData.contacto_referencia.trim(),
-        estado_punto: formData.estado_punto,
-      });
+      
+      if (isEditing && id) {
+        // Actualizar ubicación existente
+        const ubicacionActualizada = await PuntosEntregaService.update(id, {
+          nombre_punto: formData.nombre_punto.trim(),
+          direccion_fisica: formData.direccion_fisica.trim(),
+          latitud: lat,
+          longitud: lng,
+          horario_atencion: formData.horario_atencion.trim(),
+          contacto_referencia: formData.contacto_referencia.trim(),
+          estado_punto: formData.estado_punto,
+        });
 
-      toast.success(`Ubicación ${nuevaUbicacion.nombre_punto} creada exitosamente`);
-      navigate(`/ubicaciones/${nuevaUbicacion.id_punto_entrega}`);
+        toast.success(`Ubicación ${ubicacionActualizada.nombre_punto} actualizada exitosamente`);
+        navigate(`/ubicaciones/${id}`);
+      } else {
+        // Crear nueva ubicación
+        const nuevaUbicacion = await PuntosEntregaService.create({
+          nombre_punto: formData.nombre_punto.trim(),
+          direccion_fisica: formData.direccion_fisica.trim(),
+          latitud: lat,
+          longitud: lng,
+          horario_atencion: formData.horario_atencion.trim(),
+          contacto_referencia: formData.contacto_referencia.trim(),
+          estado_punto: formData.estado_punto,
+        });
+
+        toast.success(`Ubicación ${nuevaUbicacion.nombre_punto} creada exitosamente`);
+        navigate(`/ubicaciones/${nuevaUbicacion.id_punto_entrega}`);
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al crear ubicación";
+      const errorMsg = err instanceof Error ? err.message : (isEditing ? "Error al actualizar ubicación" : "Error al crear ubicación");
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Nueva Ubicación</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Ubicación" : "Nueva Ubicación"}
+        </h1>
         <p className="text-muted-foreground">
-          Registra un nuevo punto de entrega
+          {isEditing ? "Actualiza la información del punto de entrega" : "Registra un nuevo punto de entrega"}
         </p>
       </div>
 
@@ -210,14 +271,19 @@ export default function UbicacionNueva() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button type="submit" disabled={submitting || loading}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Guardando...
                   </>
+                ) : loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cargando...
+                  </>
                 ) : (
-                  "Crear Ubicación"
+                  isEditing ? "Actualizar Ubicación" : "Crear Ubicación"
                 )}
               </Button>
             </div>

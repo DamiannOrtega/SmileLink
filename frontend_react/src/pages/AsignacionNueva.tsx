@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNotificationEvents } from "@/hooks/useNotifications";
 import {
   ApadrinamientosService,
   NinosService,
@@ -32,10 +33,13 @@ const defaultCenter = {
 
 export default function AsignacionNueva() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ninos, setNinos] = useState<Nino[]>([]);
   const [padrinos, setPadrinos] = useState<Padrino[]>([]);
+  const { showNotification } = useNotificationEvents();
 
   const [formData, setFormData] = useState({
     id_nino: "",
@@ -48,7 +52,10 @@ export default function AsignacionNueva() {
 
   useEffect(() => {
     loadData();
-  }, []);
+    if (isEditing && id) {
+      loadAsignacion(id);
+    }
+  }, [isEditing, id]);
 
   const loadData = async () => {
     try {
@@ -58,13 +65,35 @@ export default function AsignacionNueva() {
         PadrinosService.getAll()
       ]);
 
-      // Filtrar solo niños disponibles
-      setNinos(ninosData.filter(n => n.estado_apadrinamiento === "Disponible"));
+      // Si está editando, mostrar todos los niños, si no, solo disponibles
+      setNinos(isEditing ? ninosData : ninosData.filter(n => n.estado_apadrinamiento === "Disponible"));
       setPadrinos(padrinosData);
     } catch (err) {
       toast.error("Error al cargar datos");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAsignacion = async (asignacionId: string) => {
+    try {
+      const asignacion = await ApadrinamientosService.getById(asignacionId);
+      if (asignacion) {
+        setFormData({
+          id_nino: asignacion.id_nino,
+          id_padrino: asignacion.id_padrino,
+          tipo_apadrinamiento: asignacion.tipo_apadrinamiento,
+          direccion_entrega: asignacion.direccion_entrega || "",
+        });
+        if (asignacion.ubicacion_entrega_lat && asignacion.ubicacion_entrega_lng) {
+          setSelectedLocation({
+            lat: asignacion.ubicacion_entrega_lat,
+            lng: asignacion.ubicacion_entrega_lng,
+          });
+        }
+      }
+    } catch (err) {
+      toast.error("Error al cargar la asignación");
     }
   };
 
@@ -88,29 +117,56 @@ export default function AsignacionNueva() {
 
     try {
       setSubmitting(true);
-      const nuevaAsignacion = await ApadrinamientosService.create({
-        id_nino: formData.id_nino,
-        id_padrino: formData.id_padrino,
-        fecha_inicio: new Date().toISOString().split("T")[0],
-        tipo_apadrinamiento: formData.tipo_apadrinamiento,
-        estado_apadrinamiento_registro: "Activo",
-        entregas_ids: [],
-        ubicacion_entrega_lat: selectedLocation?.lat,
-        ubicacion_entrega_lng: selectedLocation?.lng,
-        direccion_entrega: formData.direccion_entrega,
-      });
+      
+      if (isEditing && id) {
+        // Actualizar asignación existente
+        const asignacionActualizada = await ApadrinamientosService.update(id, {
+          id_nino: formData.id_nino,
+          id_padrino: formData.id_padrino,
+          tipo_apadrinamiento: formData.tipo_apadrinamiento,
+          ubicacion_entrega_lat: selectedLocation?.lat,
+          ubicacion_entrega_lng: selectedLocation?.lng,
+          direccion_entrega: formData.direccion_entrega,
+        });
 
-      // Actualizar estado del niño
-      await NinosService.update(formData.id_nino, {
-        estado_apadrinamiento: "Apadrinado",
-        id_padrino_actual: formData.id_padrino,
-        fecha_apadrinamiento_actual: new Date().toISOString().split("T")[0],
-      });
+        toast.success("Asignación actualizada exitosamente");
+        navigate(`/asignaciones/${id}`);
+      } else {
+        // Crear nueva asignación
+        const nuevaAsignacion = await ApadrinamientosService.create({
+          id_nino: formData.id_nino,
+          id_padrino: formData.id_padrino,
+          fecha_inicio: new Date().toISOString().split("T")[0],
+          tipo_apadrinamiento: formData.tipo_apadrinamiento,
+          estado_apadrinamiento_registro: "Activo",
+          entregas_ids: [],
+          ubicacion_entrega_lat: selectedLocation?.lat,
+          ubicacion_entrega_lng: selectedLocation?.lng,
+          direccion_entrega: formData.direccion_entrega,
+        });
 
-      toast.success("Asignación creada exitosamente");
-      navigate(`/asignaciones/${nuevaAsignacion.id_apadrinamiento}`);
+        // Actualizar estado del niño
+        await NinosService.update(formData.id_nino, {
+          estado_apadrinamiento: "Apadrinado",
+          id_padrino_actual: formData.id_padrino,
+          fecha_apadrinamiento_actual: new Date().toISOString().split("T")[0],
+        });
+
+        toast.success("Asignación creada exitosamente");
+        
+        // Mostrar notificación si está habilitada
+        const ninoNombre = ninos.find(n => n.id_nino === formData.id_nino)?.nombre || "Niño";
+        const padrinoNombre = padrinos.find(p => p.id_padrino === formData.id_padrino)?.nombre || "Padrino";
+        showNotification(
+          "success",
+          "Nuevo Apadrinamiento Creado",
+          `${padrinoNombre} ahora apadrina a ${ninoNombre}`
+        );
+        
+        navigate(`/asignaciones/${nuevaAsignacion.id_apadrinamiento}`);
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al crear asignación";
+      const errorMsg = err instanceof Error ? err.message : (isEditing ? "Error al actualizar asignación" : "Error al crear asignación");
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
@@ -131,9 +187,11 @@ export default function AsignacionNueva() {
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Nueva Asignación</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Asignación" : "Nueva Asignación"}
+        </h1>
         <p className="text-muted-foreground">
-          Crea un nuevo apadrinamiento entre un niño y un padrino
+          {isEditing ? "Actualiza la información del apadrinamiento" : "Crea un nuevo apadrinamiento entre un niño y un padrino"}
         </p>
       </div>
 
@@ -238,10 +296,10 @@ export default function AsignacionNueva() {
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
+                    Guardando...
                   </>
                 ) : (
-                  "Crear Asignación"
+                  isEditing ? "Actualizar Asignación" : "Crear Asignación"
                 )}
               </Button>
             </div>

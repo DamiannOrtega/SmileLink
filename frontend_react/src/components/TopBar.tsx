@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 export function TopBar() {
   const navigate = useNavigate();
@@ -28,12 +29,7 @@ export function TopBar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
-              3
-            </span>
-          </Button>
+          <NotificationCenter />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

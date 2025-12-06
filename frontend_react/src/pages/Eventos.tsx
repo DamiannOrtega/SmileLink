@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Plus, Search, Eye, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +21,14 @@ import { EventosService, Evento } from "@/services/api";
 
 export default function Eventos() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     loadEventos();
-  }, []);
+  }, [location.pathname, location.search]);
 
   const loadEventos = async () => {
     try {
