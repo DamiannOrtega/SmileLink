@@ -2,6 +2,7 @@
 SmileLink API - Views
 ViewSets para todas las entidades del sistema
 """
+from datetime import date
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
