@@ -4,6 +4,7 @@ ViewSets para todas las entidades del sistema
 """
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from storage import get_storage_manager, get_sync_manager
 from .serializers import (
@@ -40,7 +41,7 @@ class NinosViewSet(viewsets.ViewSet):
         if serializer.is_valid():
             new_id = storage.get_next_id('ninos', 'N')
     
-    @action(detail=True, methods=['post'], url_path='upload_avatar')
+    @action(detail=True, methods=['post'], url_path='upload_avatar', parser_classes=[MultiPartParser, FormParser])
     def upload_avatar(self, request, pk=None):
         """Sube y guarda el avatar generado"""
         nino = storage.load('ninos', pk)
