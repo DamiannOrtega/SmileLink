@@ -213,6 +213,17 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
     
     def list(self, request):
         apadrinamientos = storage.list_all('apadrinamientos')
+        
+        # Filtrar por niño si se proporciona el parámetro nino
+        nino_id = request.query_params.get('nino', None)
+        if nino_id:
+            apadrinamientos = [ap for ap in apadrinamientos if ap.get('id_nino') == nino_id]
+        
+        # Filtrar por padrino si se proporciona el parámetro padrino
+        padrino_id = request.query_params.get('padrino', None)
+        if padrino_id:
+            apadrinamientos = [ap for ap in apadrinamientos if ap.get('id_padrino') == padrino_id]
+        
         serializer = ApadrinamientoSerializer(apadrinamientos, many=True)
         return Response(serializer.data)
     
@@ -399,6 +410,9 @@ class EntregasViewSet(viewsets.ViewSet):
             from .file_utils import save_delivery_evidence
             evidence_url = save_delivery_evidence(pk, file_obj)
             
+            # Guardar el estado anterior para verificar si cambió a "Entregado"
+            estado_anterior = entrega.get('estado_entrega')
+            
             # Update Entrega record
             entrega['evidencia_foto_path'] = evidence_url
             entrega['estado_entrega'] = 'Entregado' # Auto-complete functionality
@@ -407,6 +421,12 @@ class EntregasViewSet(viewsets.ViewSet):
             entrega = make_serializable(entrega)
             storage.update('entregas', pk, entrega)
             sync.sync_entity('entregas', pk)
+            
+            # Si la entrega cambió a "Entregado", verificar si todas las entregas del apadrinamiento están completas
+            if entrega.get('estado_entrega') == 'Entregado' and estado_anterior != 'Entregado':
+                apadrinamiento_id = entrega.get('id_apadrinamiento')
+                if apadrinamiento_id:
+                    self._check_and_finalize_apadrinamiento_if_complete(apadrinamiento_id)
             
             return Response({'status': 'Evidencia subida', 'evidence_url': evidence_url})
         except Exception as e:
@@ -443,12 +463,66 @@ class EntregasViewSet(viewsets.ViewSet):
         entrega = storage.load('entregas', pk)
         if not entrega:
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Guardar el estado anterior para verificar si cambió a "Entregado"
+        estado_anterior = entrega.get('estado_entrega')
         entrega.update(request.data)
         entrega = make_serializable(entrega)
         storage.update('entregas', pk, entrega)
         sync.sync_entity('entregas', pk)
+        
+        # Si la entrega cambió a "Entregado", verificar si todas las entregas del apadrinamiento están completas
+        if entrega.get('estado_entrega') == 'Entregado' and estado_anterior != 'Entregado':
+            apadrinamiento_id = entrega.get('id_apadrinamiento')
+            if apadrinamiento_id:
+                self._check_and_finalize_apadrinamiento_if_complete(apadrinamiento_id)
+        
         serializer = EntregaSerializer(entrega)
         return Response(serializer.data)
+    
+    def _check_and_finalize_apadrinamiento_if_complete(self, apadrinamiento_id):
+        """
+        Verifica si todas las entregas del apadrinamiento están completas.
+        Si es así, finaliza el apadrinamiento automáticamente.
+        
+        NOTA: El niño NO se libera automáticamente. La fundación debe 
+        marcar manualmente al niño como "Disponible" cuando lo considere apropiado.
+        """
+        try:
+            apadrinamiento = storage.load('apadrinamientos', apadrinamiento_id)
+            if not apadrinamiento:
+                return
+            
+            entregas_ids = apadrinamiento.get('entregas_ids', [])
+            if not entregas_ids:
+                # Si no hay entregas, no hacer nada
+                return
+            
+            # Verificar el estado de todas las entregas
+            todas_entregadas = True
+            for entrega_id in entregas_ids:
+                entrega = storage.load('entregas', entrega_id)
+                if not entrega or entrega.get('estado_entrega') != 'Entregado':
+                    todas_entregadas = False
+                    break
+            
+            # Si todas las entregas están completas, finalizar el apadrinamiento
+            if todas_entregadas and apadrinamiento.get('estado_apadrinamiento_registro') != 'Finalizado':
+                print(f"[ENTREGAS] Todas las entregas completas para apadrinamiento {apadrinamiento_id}. Finalizando apadrinamiento...")
+                
+                # Actualizar estado del apadrinamiento a "Finalizado"
+                apadrinamiento['estado_apadrinamiento_registro'] = 'Finalizado'
+                apadrinamiento['fecha_fin'] = date.today().isoformat()
+                storage.update('apadrinamientos', apadrinamiento_id, apadrinamiento)
+                sync.sync_entity('apadrinamientos', apadrinamiento_id)
+                
+                print(f"[ENTREGAS] Apadrinamiento {apadrinamiento_id} finalizado. El niño permanece apadrinado hasta que la fundación lo marque como disponible.")
+                
+                # IMPORTANTE: NO liberamos automáticamente al niño.
+                # La fundación debe decidir cuándo marcar al niño como "Disponible" 
+                # desde el panel de administración.
+        except Exception as e:
+            print(f"[ENTREGAS] Error al verificar finalización de apadrinamiento: {e}")
     
     def destroy(self, request, pk=None):
         if storage.delete('entregas', pk):

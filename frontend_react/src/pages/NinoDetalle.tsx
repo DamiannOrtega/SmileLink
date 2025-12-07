@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { ArrowLeft, Pencil, User, Gift, Wand2, Save } from "lucide-react";
+import { ArrowLeft, Pencil, User, Gift, Wand2, Save, CheckCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
@@ -52,6 +52,7 @@ export default function NinoDetalle() {
   const [loading, setLoading] = useState(true);
   const [savingAvatar, setSavingAvatar] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [liberating, setLiberating] = useState(false);
 
   // --- ESTADO ULTRA-SIMPLIFICADO ---
   const [style, setStyle] = useState("avataaars");
@@ -73,8 +74,15 @@ export default function NinoDetalle() {
 
       setNino(ninoData);
 
+      // Filtrar apadrinamientos que pertenecen a este niño específico
+      // (el backend debería hacerlo, pero lo verificamos aquí por seguridad)
+      const apadrinamientosDelNino = apadrinamientosData.filter(
+        (apad) => apad.id_nino === id
+      );
+
+      // También validar que los padrinos existan
       const padrinosIds = new Set(padrinosData.map(p => p.id_padrino));
-      const apadrinamientosValidos = apadrinamientosData.filter(
+      const apadrinamientosValidos = apadrinamientosDelNino.filter(
         (apad) => padrinosIds.has(apad.id_padrino)
       );
 
@@ -156,6 +164,47 @@ export default function NinoDetalle() {
       toast.error("Error al guardar.");
     } finally {
       setSavingAvatar(false);
+    }
+  };
+
+  // Verificar si todos los apadrinamientos activos están finalizados
+  const canBeLiberated = () => {
+    if (!nino || nino.estado_apadrinamiento !== "Apadrinado") return false;
+    
+    // Obtener solo apadrinamientos activos (no finalizados)
+    const apadrinamientosActivos = apadrinamientos.filter(
+      apad => apad.estado_apadrinamiento_registro === "Activo"
+    );
+    
+    // Si no hay apadrinamientos activos, significa que todos están finalizados
+    return apadrinamientosActivos.length === 0 && apadrinamientos.length > 0;
+  };
+
+  const handleLiberarNino = async () => {
+    if (!nino || !canBeLiberated()) return;
+    
+    if (!confirm(
+      `¿Estás seguro de que deseas marcar a ${nino.nombre} como disponible para apadrinar?\n\n` +
+      `Esto permitirá que el niño aparezca nuevamente en la sección "Descubrir" para que otro padrino pueda apadrinarlo.`
+    )) {
+      return;
+    }
+
+    try {
+      setLiberating(true);
+      await NinosService.update(nino.id_nino, {
+        estado_apadrinamiento: "Disponible",
+        id_padrino_actual: null,
+        fecha_apadrinamiento_actual: null
+      });
+      
+      toast.success(`${nino.nombre} ahora está disponible para ser apadrinado nuevamente`);
+      await loadData(); // Recargar datos para reflejar el cambio
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.message || "Error al liberar al niño");
+    } finally {
+      setLiberating(false);
     }
   };
 
@@ -294,11 +343,28 @@ export default function NinoDetalle() {
                 <p className="font-mono text-sm">{nino.id_nino}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Estado</p>
+                <p className="text-sm text-muted-foreground mb-2">Estado</p>
                 <Badge variant={nino.estado_apadrinamiento === "Disponible" ? "destructive" : "default"}>
                   {nino.estado_apadrinamiento}
                 </Badge>
               </div>
+              {canBeLiberated() && (
+                <div className="pt-2 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Todos los apadrinamientos están finalizados. Puedes marcar al niño como disponible.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={handleLiberarNino}
+                    disabled={liberating}
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    {liberating ? "Marcando como disponible..." : "Marcar como Disponible"}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
