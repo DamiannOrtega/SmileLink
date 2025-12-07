@@ -20,7 +20,8 @@ import {
   Padrino,
   ApadrinamientosService,
   Apadrinamiento,
-  NinosService
+  NinosService,
+  API_BASE_URL
 } from "@/services/api";
 
 export default function PadrinoDetalle() {
@@ -47,13 +48,13 @@ export default function PadrinoDetalle() {
       ]);
 
       setPadrino(padrinoData);
-      
+
       // Filtrar apadrinamientos que tienen niño válido (no eliminado)
       const ninosIds = new Set(ninosData.map(n => n.id_nino));
       const apadrinamientosValidos = apadrinamientosData.filter(
         (apad) => ninosIds.has(apad.id_nino)
       );
-      
+
       setApadrinamientos(apadrinamientosValidos);
       setNinosMap(new Map(ninosData.map(n => [n.id_nino, n.nombre])));
     } catch (err) {
@@ -127,7 +128,15 @@ export default function PadrinoDetalle() {
           </CardHeader>
           <CardContent>
             <div className="aspect-square relative overflow-hidden rounded-lg bg-muted flex items-center justify-center mb-4">
-              <User className="h-20 w-20 text-muted-foreground" />
+              {padrino.foto_perfil ? (
+                <img
+                  src={padrino.foto_perfil.startsWith('http') ? padrino.foto_perfil : `${API_BASE_URL.replace('/api', '')}${padrino.foto_perfil}`}
+                  alt={padrino.nombre}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="h-20 w-20 text-muted-foreground" />
+              )}
             </div>
             <div className="space-y-3">
               <div>

@@ -21,6 +21,10 @@ import com.example.smilelinkapp.config.AppConfig
 import com.example.smilelinkapp.data.local.SessionManager
 import com.example.smilelinkapp.data.repository.SmileLinkRepository
 import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import java.security.MessageDigest
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -49,8 +53,40 @@ fun ProfileScreen(
     var padrinoEmail by remember { mutableStateOf(padrino?.email ?: "email@example.com") }
     var padrinoDireccion by remember { mutableStateOf(padrino?.direccion ?: "No especificada") }
     var padrinoTelefono by remember { mutableStateOf(padrino?.telefono ?: "No especificado") }
-    
+    // Inicializar URL de foto de perfil
+    var currentProfileImage by remember { mutableStateOf(padrino?.fotoPerfil) }
+
     var isLoading by remember { mutableStateOf(false) }
+
+    // Image Picker
+    val pickMedia = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                isLoading = true
+                val result = repository.uploadProfileImage(padrino?.idPadrino ?: "", uri, context)
+                result.fold(
+                    onSuccess = { url ->
+                        // Add server base URL if needed
+                        val serverUrl = AppConfig.BASE_URL.replace("/api/", "")
+                        val fullUrl = if (url.startsWith("http")) url else "$serverUrl$url"
+                        currentProfileImage = fullUrl
+                        
+                        // Update session with new image URL
+                        padrino?.let { current ->
+                            val updatedWithPhoto = current.copy(fotoPerfil = fullUrl)
+                            sessionManager.saveSession(updatedWithPhoto)
+                        }
+                        
+                        Toast.makeText(context, "Foto de perfil actualizada", Toast.LENGTH_SHORT).show()
+                    },
+                    onFailure = { e ->
+                        Toast.makeText(context, "Error al subir imagen: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                )
+                isLoading = false
+            }
+        }
+    }
     
     // Dialog states
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -145,14 +181,38 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                AsyncImage(
-                    model = "https://ui-avatars.com/api/?name=$padrinoName&size=256&background=0077BE&color=fff",
-                    contentDescription = "Foto de perfil",
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
+                Box(
+                    modifier = Modifier.size(120.dp),
+                    contentAlignment = Alignment.BottomEnd
+                ) {
+                    AsyncImage(
+                        model = currentProfileImage ?: "https://ui-avatars.com/api/?name=$padrinoName&size=256&background=0077BE&color=fff",
+                        contentDescription = "Foto de perfil",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(CircleShape)
+                            .clickable {
+                                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    // Edit icon overlay
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(32.dp).clickable {
+                             pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Cambiar foto",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.padding(6.dp)
+                        )
+                    }
+                }
                 
                 Text(
                     text = padrinoName,

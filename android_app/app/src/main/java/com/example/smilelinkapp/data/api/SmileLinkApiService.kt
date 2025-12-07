@@ -34,6 +34,13 @@ interface SmileLinkApiService {
     
     @PATCH("padrinos/{id}/")
     suspend fun updatePadrino(@Path("id") id: String, @Body padrino: Padrino): Response<Padrino>
+
+    @Multipart
+    @POST("padrinos/{id}/upload_profile_image/")
+    suspend fun uploadPadrinoProfileImage(
+        @Path("id") id: String,
+        @Part file: okhttp3.MultipartBody.Part
+    ): Response<Map<String, String>>
     
     // ===== APADRINAMIENTOS (Sponsorships) =====
     @GET("apadrinamientos/")

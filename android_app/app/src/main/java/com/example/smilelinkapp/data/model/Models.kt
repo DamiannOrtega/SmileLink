@@ -65,6 +65,9 @@ data class Padrino(
     @SerializedName("telefono")
     val telefono: String? = null,
     
+    @SerializedName("foto_perfil")
+    val fotoPerfil: String? = null,
+    
     @SerializedName("historial_apadrinamiento_ids")
     val historialApadrinamientoIds: List<String> = emptyList()
 )

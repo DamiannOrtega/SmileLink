@@ -22,6 +22,7 @@ export interface Padrino {
   direccion: string;
   telefono: string;
   historial_apadrinamiento_ids: string[]; // FKs to Apadrinamiento
+  foto_perfil?: string;
 }
 
 export interface Nino {

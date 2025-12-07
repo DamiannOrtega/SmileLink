@@ -137,6 +137,39 @@ class SmileLinkRepository {
             }
         }
     }
+
+    suspend fun uploadProfileImage(padrinoId: String, imageUri: android.net.Uri, context: android.content.Context): Result<String> {
+        return if (AppConfig.USE_MOCK) {
+            delay(1000)
+            Result.success("https://ui-avatars.com/api/?name=User&size=256&background=0077BE&color=fff")
+        } else {
+            try {
+                val contentResolver = context.contentResolver
+                val inputStream = contentResolver.openInputStream(imageUri)
+                    ?: return Result.failure(Exception("No se pudo abrir la imagen"))
+                
+                val bytes = inputStream.readBytes()
+                inputStream.close()
+                
+                val requestFile = okhttp3.RequestBody.create(
+                    "image/*".toMediaTypeOrNull(),
+                    bytes
+                )
+                
+                val body = okhttp3.MultipartBody.Part.createFormData("file", "profile.jpg", requestFile)
+                
+                val response = apiService.uploadPadrinoProfileImage(padrinoId, body)
+                if (response.isSuccessful && response.body() != null) {
+                    val url = response.body()!!["foto_perfil"] ?: ""
+                    Result.success(url)
+                } else {
+                    Result.failure(Exception("Error subiendo foto de perfil: ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
     
     // ===== APADRINAMIENTOS (Sponsorships) =====
     
