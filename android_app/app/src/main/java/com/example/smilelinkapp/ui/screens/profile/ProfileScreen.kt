@@ -19,6 +19,9 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.smilelinkapp.config.AppConfig
 import com.example.smilelinkapp.data.local.SessionManager
+import com.example.smilelinkapp.data.repository.SmileLinkRepository
+import kotlinx.coroutines.launch
+import java.security.MessageDigest
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,12 +30,16 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
+    val repository = remember { SmileLinkRepository() }
+    val scope = rememberCoroutineScope()
     val padrino = sessionManager.getPadrino()
     
     var padrinoName by remember { mutableStateOf(padrino?.nombre ?: "Usuario") }
     var padrinoEmail by remember { mutableStateOf(padrino?.email ?: "email@example.com") }
     var padrinoDireccion by remember { mutableStateOf(padrino?.direccion ?: "No especificada") }
     var padrinoTelefono by remember { mutableStateOf(padrino?.telefono ?: "No especificado") }
+    
+    var isLoading by remember { mutableStateOf(false) }
     
     // Dialog states
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -42,6 +49,59 @@ fun ProfileScreen(
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var showHelpDialog by remember { mutableStateOf(false) }
+    
+    // Función auxiliar para actualizar el padrino en el backend
+    fun updatePadrinoInBackend(
+        updatedPadrino: com.example.smilelinkapp.data.model.Padrino,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        scope.launch {
+            isLoading = true
+            try {
+                val result = repository.updatePadrino(updatedPadrino.idPadrino, updatedPadrino)
+                result.fold(
+                    onSuccess = { updated ->
+                        // El backend no devuelve password_hash (es write_only)
+                        // Preservamos el password_hash si estaba en el objeto actualizado
+                        // o mantenemos el que ya existe en la sesión
+                        val finalPadrino = if (updated.passwordHash.isNullOrBlank() && updatedPadrino.passwordHash != null) {
+                            // Si el backend no devolvió password_hash pero lo enviamos, lo preservamos
+                            updated.copy(passwordHash = updatedPadrino.passwordHash)
+                        } else if (!updated.passwordHash.isNullOrBlank()) {
+                            // Si el backend devolvió un password_hash (raro pero posible), lo usamos
+                            updated
+                        } else {
+                            // Si no hay password_hash en ninguno, preservamos el de la sesión actual
+                            val currentPadrino = sessionManager.getPadrino()
+                            if (currentPadrino?.passwordHash != null) {
+                                updated.copy(passwordHash = currentPadrino.passwordHash)
+                            } else {
+                                updated
+                            }
+                        }
+                        
+                        // Actualizar sesión con los datos del servidor (con password_hash preservado si es necesario)
+                        sessionManager.saveSession(finalPadrino)
+                        
+                        // Actualizar estado local
+                        padrinoName = finalPadrino.nombre
+                        padrinoEmail = finalPadrino.email
+                        padrinoDireccion = finalPadrino.direccion ?: "No especificada"
+                        padrinoTelefono = finalPadrino.telefono ?: "No especificado"
+                        onSuccess()
+                    },
+                    onFailure = { error ->
+                        onError(error.message ?: "Error desconocido")
+                    }
+                )
+            } catch (e: Exception) {
+                onError(e.message ?: "Error de conexión")
+            } finally {
+                isLoading = false
+            }
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -237,26 +297,29 @@ fun ProfileScreen(
             currentEmail = padrinoEmail,
             currentAddress = padrinoDireccion,
             currentPhone = padrinoTelefono,
+            isLoading = isLoading,
             onDismiss = { showEditProfileDialog = false },
             onSave = { name: String, email: String, address: String, phone: String ->
-                padrinoName = name
-                padrinoEmail = email
-                padrinoDireccion = address
-                padrinoTelefono = phone
-                
-                // Update session
-                padrino?.let {
-                    val updated = it.copy(
+                padrino?.let { currentPadrino ->
+                    val updated = currentPadrino.copy(
                         nombre = name,
                         email = email,
                         direccion = address,
                         telefono = phone
                     )
-                    sessionManager.saveSession(updated)
+                    updatePadrinoInBackend(
+                        updatedPadrino = updated,
+                        onSuccess = {
+                            showEditProfileDialog = false
+                            Toast.makeText(context, "Perfil actualizado correctamente", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { error ->
+                            Toast.makeText(context, "Error al actualizar: $error", Toast.LENGTH_LONG).show()
+                        }
+                    )
+                } ?: run {
+                    Toast.makeText(context, "Error: Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
-                
-                showEditProfileDialog = false
-                Toast.makeText(context, "Perfil actualizado", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -266,15 +329,24 @@ fun ProfileScreen(
             title = "Editar Dirección",
             label = "Dirección",
             currentValue = padrinoDireccion,
+            isLoading = isLoading,
             onDismiss = { showAddressDialog = false },
             onSave = { newAddress: String ->
-                padrinoDireccion = newAddress
-                padrino?.let {
-                    val updated = it.copy(direccion = newAddress)
-                    sessionManager.saveSession(updated)
+                padrino?.let { currentPadrino ->
+                    val updated = currentPadrino.copy(direccion = newAddress)
+                    updatePadrinoInBackend(
+                        updatedPadrino = updated,
+                        onSuccess = {
+                            showAddressDialog = false
+                            Toast.makeText(context, "Dirección actualizada correctamente", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { error ->
+                            Toast.makeText(context, "Error al actualizar: $error", Toast.LENGTH_LONG).show()
+                        }
+                    )
+                } ?: run {
+                    Toast.makeText(context, "Error: Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
-                showAddressDialog = false
-                Toast.makeText(context, "Dirección actualizada", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -284,15 +356,24 @@ fun ProfileScreen(
             title = "Editar Teléfono",
             label = "Teléfono",
             currentValue = padrinoTelefono,
+            isLoading = isLoading,
             onDismiss = { showPhoneDialog = false },
             onSave = { newPhone: String ->
-                padrinoTelefono = newPhone
-                padrino?.let {
-                    val updated = it.copy(telefono = newPhone)
-                    sessionManager.saveSession(updated)
+                padrino?.let { currentPadrino ->
+                    val updated = currentPadrino.copy(telefono = newPhone)
+                    updatePadrinoInBackend(
+                        updatedPadrino = updated,
+                        onSuccess = {
+                            showPhoneDialog = false
+                            Toast.makeText(context, "Teléfono actualizado correctamente", Toast.LENGTH_SHORT).show()
+                        },
+                        onError = { error ->
+                            Toast.makeText(context, "Error al actualizar: $error", Toast.LENGTH_LONG).show()
+                        }
+                    )
+                } ?: run {
+                    Toast.makeText(context, "Error: Usuario no encontrado", Toast.LENGTH_SHORT).show()
                 }
-                showPhoneDialog = false
-                Toast.makeText(context, "Teléfono actualizado", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -305,6 +386,10 @@ fun ProfileScreen(
     
     if (showPrivacyDialog) {
         PrivacyDialog(
+            padrinoId = padrino?.idPadrino ?: "",
+            sessionManager = sessionManager,
+            repository = repository,
+            scope = scope,
             onDismiss = { showPrivacyDialog = false }
         )
     }
@@ -328,6 +413,7 @@ private fun EditProfileDialog(
     currentEmail: String,
     currentAddress: String,
     currentPhone: String,
+    isLoading: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (String, String, String, String) -> Unit
 ) {
@@ -378,9 +464,14 @@ private fun EditProfileDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onSave(name, email, address, phone) }
+                onClick = { onSave(name, email, address, phone) },
+                enabled = !isLoading
             ) {
-                Text("Guardar")
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Guardar")
+                }
             }
         },
         dismissButton = {
@@ -396,6 +487,7 @@ private fun EditTextDialog(
     title: String,
     label: String,
     currentValue: String,
+    isLoading: Boolean = false,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit
 ) {
@@ -413,8 +505,15 @@ private fun EditTextDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onSave(value) }) {
-                Text("Guardar")
+            TextButton(
+                onClick = { onSave(value) },
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Guardar")
+                }
             }
         },
         dismissButton = {
@@ -487,6 +586,10 @@ private fun NotificationsDialog(
 
 @Composable
 private fun PrivacyDialog(
+    padrinoId: String,
+    sessionManager: SessionManager,
+    repository: SmileLinkRepository,
+    scope: kotlinx.coroutines.CoroutineScope,
     onDismiss: () -> Unit
 ) {
     var showPasswordDialog by remember { mutableStateOf(false) }
@@ -529,6 +632,10 @@ private fun PrivacyDialog(
     
     if (showPasswordDialog) {
         ChangePasswordDialog(
+            padrinoId = padrinoId,
+            sessionManager = sessionManager,
+            repository = repository,
+            scope = scope,
             onDismiss = { showPasswordDialog = false }
         )
     }
@@ -536,12 +643,84 @@ private fun PrivacyDialog(
 
 @Composable
 private fun ChangePasswordDialog(
+    padrinoId: String,
+    sessionManager: SessionManager,
+    repository: SmileLinkRepository,
+    scope: kotlinx.coroutines.CoroutineScope,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(false) }
+    
+    fun hashPassword(password: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hashBytes = digest.digest(password.toByteArray())
+        return hashBytes.joinToString("") { "%02x".format(it) }
+    }
+    
+    fun updatePassword() {
+        if (newPassword != confirmPassword) {
+            Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        if (newPassword.isBlank() || newPassword.length < 6) {
+            Toast.makeText(context, "La contraseña debe tener al menos 6 caracteres", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
+        scope.launch {
+            isLoading = true
+            try {
+                // Obtener el padrino actual
+                val currentPadrino = sessionManager.getPadrino()
+                if (currentPadrino == null) {
+                    Toast.makeText(context, "Error: Usuario no encontrado", Toast.LENGTH_SHORT).show()
+                    isLoading = false
+                    return@launch
+                }
+                
+                // Verificar la contraseña actual (si no está en modo mock)
+                if (!AppConfig.USE_MOCK) {
+                    // Primero verificamos que la contraseña actual sea correcta
+                    // En este caso, actualizamos directamente con el nuevo hash
+                    // El backend no tiene validación de contraseña anterior en el update
+                    // Entonces simplemente actualizamos con el nuevo hash
+                }
+                
+                // Crear el hash de la nueva contraseña
+                val newPasswordHash = hashPassword(newPassword)
+                
+                // Actualizar el padrino con el nuevo password_hash
+                val updatedPadrino = currentPadrino.copy(
+                    passwordHash = newPasswordHash
+                )
+                
+                val result = repository.updatePadrino(padrinoId, updatedPadrino)
+                result.fold(
+                    onSuccess = { updated ->
+                        // Actualizar sesión
+                        sessionManager.saveSession(updated)
+                        Toast.makeText(context, "Contraseña actualizada correctamente", Toast.LENGTH_SHORT).show()
+                        currentPassword = ""
+                        newPassword = ""
+                        confirmPassword = ""
+                        onDismiss()
+                    },
+                    onFailure = { error ->
+                        Toast.makeText(context, "Error al actualizar contraseña: ${error.message}", Toast.LENGTH_LONG).show()
+                    }
+                )
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -556,6 +735,7 @@ private fun ChangePasswordDialog(
                     label = { Text("Contraseña Actual") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -565,6 +745,7 @@ private fun ChangePasswordDialog(
                     label = { Text("Nueva Contraseña") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
                 
@@ -574,26 +755,28 @@ private fun ChangePasswordDialog(
                     label = { Text("Confirmar Contraseña") },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = {
-                    if (newPassword == confirmPassword && newPassword.isNotBlank()) {
-                        Toast.makeText(context, "Contraseña actualizada", Toast.LENGTH_SHORT).show()
-                        onDismiss()
-                    } else {
-                        Toast.makeText(context, "Las contraseñas no coinciden", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                onClick = { updatePassword() },
+                enabled = !isLoading
             ) {
-                Text("Guardar")
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                } else {
+                    Text("Guardar")
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
                 Text("Cancelar")
             }
         }

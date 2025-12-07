@@ -157,11 +157,50 @@ class PadrinosViewSet(viewsets.ViewSet):
         padrino = storage.load('padrinos', pk)
         if not padrino:
             return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-        padrino.update(request.data)
-        storage.update('padrinos', pk, padrino)
+        
+        print(f"[PADRINO UPDATE] Request data: {request.data}")
+        print(f"[PADRINO UPDATE] Current padrino before update: {padrino}")
+        
+        # Filtrar campos None del request.data para evitar problemas
+        # Solo actualizamos los campos que están presentes y no son None
+        update_data = {k: v for k, v in request.data.items() if v is not None}
+        print(f"[PADRINO UPDATE] Filtered update data (excluding None): {update_data}")
+        
+        # Validar datos con el serializer
+        serializer = PadrinoSerializer(padrino, data=update_data, partial=True)
+        if not serializer.is_valid():
+            print(f"[PADRINO UPDATE] Validation errors: {serializer.errors}")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Actualizar solo los campos validados
+        validated_data = serializer.validated_data
+        print(f"[PADRINO UPDATE] Validated data: {validated_data}")
+        
+        # Convertir fecha_registro a string si es date object
+        if 'fecha_registro' in validated_data and hasattr(validated_data['fecha_registro'], 'isoformat'):
+            validated_data['fecha_registro'] = validated_data['fecha_registro'].isoformat()
+        
+        # Actualizar el padrino con los datos validados (solo los campos que cambiaron)
+        for key, value in validated_data.items():
+            padrino[key] = value
+        
+        print(f"[PADRINO UPDATE] Padrino after update: {padrino}")
+        
+        # Guardar en storage
+        save_result = storage.update('padrinos', pk, padrino)
+        print(f"[PADRINO UPDATE] Save result: {save_result}")
+        
+        # Verificar que se guardó correctamente
+        verification = storage.load('padrinos', pk)
+        print(f"[PADRINO UPDATE] Verification after save: {verification}")
+        
         sync.sync_entity('padrinos', pk)
-        serializer = PadrinoSerializer(padrino)
-        return Response(serializer.data)
+        
+        # Devolver el padrino actualizado
+        response_serializer = PadrinoSerializer(padrino)
+        response_data = response_serializer.data
+        print(f"[PADRINO UPDATE] Response data: {response_data}")
+        return Response(response_data)
     
     def destroy(self, request, pk=None):
         if storage.delete('padrinos', pk):

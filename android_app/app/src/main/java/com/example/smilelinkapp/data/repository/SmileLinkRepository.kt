@@ -120,6 +120,24 @@ class SmileLinkRepository {
         }
     }
     
+    suspend fun updatePadrino(id: String, padrino: Padrino): Result<Padrino> {
+        return if (AppConfig.USE_MOCK) {
+            delay(500)
+            Result.success(padrino)
+        } else {
+            try {
+                val response = apiService.updatePadrino(id, padrino)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else {
+                    Result.failure(Exception("Error: ${response.code()} - ${response.message()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+    
     // ===== APADRINAMIENTOS (Sponsorships) =====
     
     suspend fun getApadrinamientosForPadrino(padrinoId: String): Result<List<Apadrinamiento>> {
