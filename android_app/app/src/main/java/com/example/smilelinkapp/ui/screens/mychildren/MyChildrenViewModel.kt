@@ -21,7 +21,10 @@ data class SponsoredChildInfo(
 
 sealed class MyChildrenUiState {
     object Loading : MyChildrenUiState()
-    data class Success(val children: List<SponsoredChildInfo>) : MyChildrenUiState()
+    data class Success(
+        val children: List<SponsoredChildInfo>,
+        val history: List<SponsoredChildInfo> = emptyList()
+    ) : MyChildrenUiState()
     data class Error(val message: String) : MyChildrenUiState()
     object Empty : MyChildrenUiState()
 }
@@ -63,35 +66,34 @@ class MyChildrenViewModel(application: Application) : AndroidViewModel(applicati
                 
                 val apadrinamientos = apadrinamientosResult.getOrNull() ?: emptyList()
                 
-                // Filter only active sponsorships
-                val activeApadrinamientos = apadrinamientos.filter { 
-                    it.estadoApadrinamientoRegistro == "Activo" 
-                }
+                // Get details for all sponsorships
+                val activeChildrenInfo = mutableListOf<SponsoredChildInfo>()
+                val historyChildrenInfo = mutableListOf<SponsoredChildInfo>()
                 
-                if (activeApadrinamientos.isEmpty()) {
-                    _uiState.value = MyChildrenUiState.Empty
-                    return@launch
-                }
-                
-                // Get details for each sponsored child
-                val childrenInfo = mutableListOf<SponsoredChildInfo>()
-                
-                for (apadrinamiento in activeApadrinamientos) {
+                for (apadrinamiento in apadrinamientos) {
                     val ninoResult = repository.getNino(apadrinamiento.idNino)
                     val entregasResult = repository.getEntregasForApadrinamiento(apadrinamiento.idApadrinamiento)
                     
                     if (ninoResult.isSuccess) {
-                        childrenInfo.add(
-                            SponsoredChildInfo(
-                                nino = ninoResult.getOrNull()!!,
-                                apadrinamiento = apadrinamiento,
-                                entregas = entregasResult.getOrNull() ?: emptyList()
-                            )
+                        val info = SponsoredChildInfo(
+                            nino = ninoResult.getOrNull()!!,
+                            apadrinamiento = apadrinamiento,
+                            entregas = entregasResult.getOrNull() ?: emptyList()
                         )
+                        
+                        if (apadrinamiento.estadoApadrinamientoRegistro == "Activo") {
+                            activeChildrenInfo.add(info)
+                        } else {
+                            historyChildrenInfo.add(info)
+                        }
                     }
                 }
                 
-                _uiState.value = MyChildrenUiState.Success(childrenInfo)
+                if (activeChildrenInfo.isEmpty() && historyChildrenInfo.isEmpty()) {
+                    _uiState.value = MyChildrenUiState.Empty
+                } else {
+                    _uiState.value = MyChildrenUiState.Success(activeChildrenInfo, historyChildrenInfo)
+                }
                 
             } catch (e: Exception) {
                 _uiState.value = MyChildrenUiState.Error(e.message ?: "Error desconocido")

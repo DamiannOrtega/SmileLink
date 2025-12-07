@@ -9,6 +9,11 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,13 +38,15 @@ fun MyChildrenScreen(
     viewModel: MyChildrenViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showHistory by remember { mutableStateOf(false) }
+    var selectedEvidenceUrl by remember { mutableStateOf<String?>(null) }
     
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { 
                     Text(
-                        "Mis Ahijados",
+                        if (showHistory) "Historial" else "Mis Ahijados",
                         style = MaterialTheme.typography.headlineSmall
                     ) 
                 },
@@ -48,6 +55,12 @@ fun MyChildrenScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "Actualizar"
+                        )
+                    }
+                    IconButton(onClick = { showHistory = !showHistory }) {
+                        Icon(
+                            imageVector = if (showHistory) Icons.Default.CheckCircle else Icons.Default.DateRange,
+                            contentDescription = if (showHistory) "Ver Activos" else "Ver Historial"
                         )
                     }
                 },
@@ -65,6 +78,7 @@ fun MyChildrenScreen(
             }
             
             is MyChildrenUiState.Success -> {
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
@@ -72,12 +86,34 @@ fun MyChildrenScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(state.children) { childInfo ->
-                        SponsoredChildCard(
-                            childInfo = childInfo,
-                            onClick = { onChildClick(childInfo.nino.idNino) }
-                        )
+                    val listToShow = if (showHistory) state.history else state.children
+                    
+                    if (listToShow.isEmpty()) {
+                        item {
+                            EmptyState(
+                                title = if (showHistory) "Sin historial" else "No tienes ahijados activos",
+                                message = if (showHistory) "No hay apadrinamientos anteriores" else "Explora niños disponibles y comienza a apadrinar",
+                                emoji = if (showHistory) "📜" else "💝"
+                            )
+                        }
+                    } else {
+                        items(listToShow) { childInfo ->
+                            SponsoredChildCard(
+                                childInfo = childInfo,
+                                onClick = { 
+                                    if (!showHistory) {
+                                        onChildClick(childInfo.nino.idNino) 
+                                    }
+                                },
+                                isHistory = showHistory,
+                                onEvidenceClick = { url -> selectedEvidenceUrl = url }
+                            )
+                        }
                     }
+                }
+
+                if (selectedEvidenceUrl != null) {
+                    EvidenceDialog(url = selectedEvidenceUrl!!, onDismiss = { selectedEvidenceUrl = null })
                 }
             }
             
@@ -127,7 +163,9 @@ private fun resolveAvatarUrl(url: String?, childName: String): String {
 @Composable
 private fun SponsoredChildCard(
     childInfo: SponsoredChildInfo,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isHistory: Boolean = false,
+    onEvidenceClick: (String) -> Unit = {}
 ) {
     Card(
         onClick = onClick,
@@ -183,7 +221,14 @@ private fun SponsoredChildCard(
                 )
                 
                 childInfo.entregas.forEach { entrega ->
-                    DeliveryStatusItem(entrega)
+                    DeliveryStatusItem(
+                        entrega = entrega,
+                        onEvidenceClick = {
+                            if (entrega.evidenciaFotoPath != null) {
+                                onEvidenceClick(entrega.evidenciaFotoPath)
+                            }
+                        }
+                    )
                 }
             } else {
                 Row(
@@ -207,47 +252,4 @@ private fun SponsoredChildCard(
     }
 }
 
-@Composable
-private fun DeliveryStatusItem(entrega: Entrega) {
-    val (icon, color, statusText) = when (entrega.estadoEntrega) {
-        "Entregado" -> Triple(Icons.Default.CheckCircle, SuccessGreen, "Entregado")
-        "En Proceso" -> Triple(Icons.Default.Info, WarningOrange, "En proceso")
-        else -> Triple(Icons.Default.Info, MaterialTheme.colorScheme.onSurfaceVariant, "Pendiente")
-    }
-    
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(20.dp)
-            )
-            
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                Text(
-                    text = entrega.descripcionRegalo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                
-                Text(
-                    text = "$statusText • ${entrega.fechaProgramada}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
+
