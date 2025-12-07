@@ -43,13 +43,16 @@ export function AppSidebar() {
       <SidebarContent>
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-              <Heart className="h-5 w-5 text-primary-foreground" />
+            {/* LOGO SIDEBAR - Cambiar tamaño: h-16 w-16 (actual) a h-X w-X donde X es el tamaño deseado */}
+            <div className="flex h-17 w-17 items-center justify-center rounded-lg overflow-hidden">
+              <img 
+                src="/logo.png" 
+                alt="SmileLink Logo" 
+                className="h-full w-full object-contain"
+              />
             </div>
             {!isCollapsed && (
               <div>
-                <h2 className="text-lg font-semibold text-foreground">SmileLink</h2>
-                <p className="text-xs text-muted-foreground">Panel Admin</p>
               </div>
             )}
           </div>

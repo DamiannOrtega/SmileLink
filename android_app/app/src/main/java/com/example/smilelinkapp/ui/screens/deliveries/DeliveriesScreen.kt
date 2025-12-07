@@ -3,8 +3,10 @@ package com.example.smilelinkapp.ui.screens.deliveries
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.net.Uri
 import android.preference.PreferenceManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -412,6 +414,29 @@ fun DeliveryCard(
                                 deliveryPointName = puntoEntrega.nombrePunto
                             )
                         }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Botón para abrir en Google Maps
+                        OutlinedButton(
+                            onClick = {
+                                openLocationInGoogleMaps(
+                                    context = context,
+                                    latitude = puntoEntrega.latitud,
+                                    longitude = puntoEntrega.longitud,
+                                    placeName = puntoEntrega.nombrePunto
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Abrir en Google Maps")
+                        }
                     }
                 }
                 
@@ -507,6 +532,66 @@ fun MapViewComposable(
             mapView.invalidate()
         }
     )
+}
+
+/**
+ * Abre la ubicación en Google Maps u otras aplicaciones de mapas disponibles
+ * @param context Contexto de la aplicación
+ * @param latitude Latitud del punto
+ * @param longitude Longitud del punto
+ * @param placeName Nombre del lugar (opcional)
+ */
+fun openLocationInGoogleMaps(
+    context: Context,
+    latitude: Double,
+    longitude: Double,
+    placeName: String? = null
+) {
+    try {
+        // Primero intentamos abrir con Google Maps directamente
+        val googleMapsUri = if (placeName != null) {
+            // URI con nombre del lugar
+            Uri.parse("geo:0,0?q=$latitude,$longitude(${Uri.encode(placeName)})")
+        } else {
+            // URI solo con coordenadas
+            Uri.parse("geo:$latitude,$longitude")
+        }
+        
+        val mapIntent = Intent(Intent.ACTION_VIEW, googleMapsUri).apply {
+            setPackage("com.google.android.apps.maps")
+        }
+        
+        // Verificar si Google Maps está instalado
+        if (mapIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(mapIntent)
+        } else {
+            // Si no está Google Maps, usar URI genérico que abrirá cualquier app de mapas
+            val fallbackUri = if (placeName != null) {
+                Uri.parse("https://www.google.com/maps/search/?api=1&query=$latitude,$longitude&query_place_id=${Uri.encode(placeName)}")
+            } else {
+                Uri.parse("https://www.google.com/maps/search/?api=1&query=$latitude,$longitude")
+            }
+            
+            val fallbackIntent = Intent(Intent.ACTION_VIEW, fallbackUri)
+            
+            // Si hay alguna app que pueda manejar esto, la abrimos
+            if (fallbackIntent.resolveActivity(context.packageManager) != null) {
+                context.startActivity(fallbackIntent)
+            } else {
+                // Último recurso: usar geo: que funciona con la mayoría de apps de mapas
+                val geoIntent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:$latitude,$longitude?q=$latitude,$longitude(${Uri.encode(placeName ?: "Ubicación")})"))
+                context.startActivity(geoIntent)
+            }
+        }
+    } catch (e: Exception) {
+        Log.e(TAG, "Error al abrir Google Maps", e)
+        // Mostrar mensaje de error al usuario
+        android.widget.Toast.makeText(
+            context,
+            "No se pudo abrir la ubicación en Google Maps",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+    }
 }
 
 fun createMarkerDrawable(context: Context, color: Int): android.graphics.drawable.Drawable {

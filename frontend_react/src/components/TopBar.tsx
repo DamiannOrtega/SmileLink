@@ -26,6 +26,8 @@ export function TopBar() {
       <div className="flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-4">
           <SidebarTrigger />
+          {/* LOGO TOPBAR - Cambiar tamaño: h-12 (actual) a h-X donde X es el tamaño deseado */}
+          
         </div>
 
         <div className="flex items-center gap-4">

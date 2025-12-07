@@ -18,6 +18,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.example.smilelinkapp.config.AppConfig
+import com.example.smilelinkapp.utils.ValidationUtils
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -31,6 +34,10 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
+    
+    // Estados de validación
+    var emailError by remember { mutableStateOf<String?>(null) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
     
     val uiState by viewModel.uiState.collectAsState()
     
@@ -54,19 +61,15 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
             // Logo/Title
-            Text(
-                text = "💝",
-                style = MaterialTheme.typography.displayLarge,
-                modifier = Modifier.padding(bottom = 8.dp)
+            // LOGO ANDROID LOGIN - Cambiar tamaño: .size(180.dp) (actual) a .size(X.dp) donde X es el tamaño deseado
+            AsyncImage(
+                model = AppConfig.LOGO_URL,
+                contentDescription = "SmileLink Logo",
+                modifier = Modifier
+                    .size(320.dp)
+                    .padding(bottom = 18.dp)
             )
-            
-            Text(
-                text = "SmileLink",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            
+
             Text(
                 text = "Conectando corazones, cambiando vidas",
                 style = MaterialTheme.typography.bodyMedium,
@@ -78,7 +81,14 @@ fun LoginScreen(
             // Email field
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = { 
+                    email = it
+                    emailError = when {
+                        it.isBlank() -> null // No mostrar error hasta que intente enviar
+                        !ValidationUtils.isValidEmail(it) -> ValidationUtils.ErrorMessages.EMAIL_INVALID
+                        else -> null
+                    }
+                },
                 label = { Text("Email") },
                 leadingIcon = {
                     Icon(Icons.Default.Email, contentDescription = null)
@@ -86,7 +96,9 @@ fun LoginScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
+                isError = emailError != null,
+                supportingText = emailError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -94,7 +106,14 @@ fun LoginScreen(
             // Password field
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it },
+                onValueChange = { 
+                    password = it
+                    passwordError = when {
+                        it.isBlank() -> null // No mostrar error hasta que intente enviar
+                        it.length < 6 -> ValidationUtils.ErrorMessages.PASSWORD_TOO_SHORT
+                        else -> null
+                    }
+                },
                 label = { Text("Contraseña") },
                 leadingIcon = {
                     Icon(Icons.Default.Lock, contentDescription = null)
@@ -111,7 +130,9 @@ fun LoginScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium
+                shape = MaterialTheme.shapes.medium,
+                isError = passwordError != null,
+                supportingText = passwordError?.let { { Text(it, color = MaterialTheme.colorScheme.error) } }
             )
             
             Spacer(modifier = Modifier.height(24.dp))

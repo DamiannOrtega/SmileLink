@@ -17,13 +17,15 @@ import {
   NinosService,
   PadrinosService,
   PuntosEntregaService,
+  EntregasService,
   Apadrinamiento,
   Nino,
   Padrino,
   PuntoEntrega
 } from "@/services/api";
-import { Pencil, ArrowLeft, User, Heart, Calendar, MapPin, Save } from "lucide-react";
+import { Pencil, ArrowLeft, User, Heart, Calendar, MapPin, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import LeafletMapComponent from "@/components/LeafletMapComponent";
 
 export default function AsignacionDetalle() {
@@ -37,6 +39,8 @@ export default function AsignacionDetalle() {
   const [ubicaciones, setUbicaciones] = useState<PuntoEntrega[]>([]);
   const [selectedUbicacion, setSelectedUbicacion] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -104,6 +108,31 @@ export default function AsignacionDetalle() {
       toast.error("Error al guardar la ubicación");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCancelarAsignacion = async () => {
+    if (!asignacion || !id) {
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      
+      // El backend se encarga de:
+      // 1. Eliminar todas las entregas asociadas
+      // 2. Actualizar el niño a "Disponible" y limpiar id_padrino_actual
+      // 3. Eliminar el apadrinamiento
+      await ApadrinamientosService.delete(id);
+
+      toast.success("Asignación cancelada correctamente. El niño está ahora disponible para apadrinar.");
+      navigate("/asignaciones");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || "Error al cancelar la asignación");
+    } finally {
+      setCancelling(false);
+      setShowCancelDialog(false);
     }
   };
 
@@ -305,11 +334,35 @@ export default function AsignacionDetalle() {
           <CardTitle>Acciones Disponibles</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-4">
-          <Button variant="destructive" onClick={() => toast.error("Función no implementada aún")}>
-            Cancelar Asignación
+          <Button 
+            variant="destructive" 
+            onClick={() => setShowCancelDialog(true)}
+            disabled={cancelling}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {cancelling ? "Cancelando..." : "Cancelar Asignación"}
           </Button>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={showCancelDialog}
+        onOpenChange={setShowCancelDialog}
+        title="¿Cancelar Asignación?"
+        description={
+          `¿Estás seguro de que deseas cancelar esta asignación? Esta acción:
+          
+• Desasignará al niño (quedará disponible para apadrinar)
+• Eliminará todas las entregas asociadas
+• El niño aparecerá nuevamente en la sección "Descubrir"
+• La asignación desaparecerá de "Mis Ahijados" del padrino
+
+Esta acción no se puede deshacer.`
+        }
+        onConfirm={handleCancelarAsignacion}
+        confirmText={cancelling ? "Cancelando..." : "Sí, cancelar asignación"}
+        cancelText="No, mantener asignación"
+      />
     </div>
   );
 }

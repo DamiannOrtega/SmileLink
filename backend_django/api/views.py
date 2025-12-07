@@ -299,9 +299,67 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def destroy(self, request, pk=None):
+        """
+        Cancela/elimina un apadrinamiento
+        Esto debe:
+        1. Eliminar todas las entregas asociadas
+        2. Actualizar el niño a "Disponible" y limpiar id_padrino_actual
+        3. Remover el apadrinamiento del historial del padrino
+        4. Eliminar el apadrinamiento
+        """
+        apadrinamiento = storage.load('apadrinamientos', pk)
+        if not apadrinamiento:
+            return Response({'error': 'Apadrinamiento no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        
+        print(f"[CANCELAR ASIGNACION] Iniciando cancelación de {pk}")
+        print(f"[CANCELAR ASIGNACION] Datos del apadrinamiento: {apadrinamiento}")
+        
+        # 1. Eliminar todas las entregas asociadas
+        entregas_ids = apadrinamiento.get('entregas_ids', [])
+        print(f"[CANCELAR ASIGNACION] Eliminando {len(entregas_ids)} entregas: {entregas_ids}")
+        for entrega_id in entregas_ids:
+            try:
+                if storage.delete('entregas', entrega_id):
+                    print(f"[CANCELAR ASIGNACION] Entrega {entrega_id} eliminada")
+                else:
+                    print(f"[CANCELAR ASIGNACION] Advertencia: Entrega {entrega_id} no encontrada")
+            except Exception as e:
+                print(f"[CANCELAR ASIGNACION] Error al eliminar entrega {entrega_id}: {e}")
+        
+        # 2. Actualizar el niño a "Disponible" y limpiar id_padrino_actual
+        nino_id = apadrinamiento.get('id_nino')
+        if nino_id:
+            try:
+                nino = storage.load('ninos', nino_id)
+                if nino:
+                    # Solo actualizar si este es el apadrinamiento actual
+                    if nino.get('id_padrino_actual') == apadrinamiento.get('id_padrino'):
+                        nino['estado_apadrinamiento'] = 'Disponible'
+                        nino['id_padrino_actual'] = None
+                        nino['fecha_apadrinamiento_actual'] = None
+                        storage.update('ninos', nino_id, nino)
+                        sync.sync_entity('ninos', nino_id)
+                        print(f"[CANCELAR ASIGNACION] Niño {nino_id} actualizado a Disponible")
+                    else:
+                        print(f"[CANCELAR ASIGNACION] Niño {nino_id} tiene otro padrino actual, no se actualiza")
+                else:
+                    print(f"[CANCELAR ASIGNACION] Advertencia: Niño {nino_id} no encontrado")
+            except Exception as e:
+                print(f"[CANCELAR ASIGNACION] Error al actualizar niño {nino_id}: {e}")
+        
+        # 3. Remover del historial del padrino (opcional, el historial puede mantener el registro)
+        # Por ahora no removemos del historial para mantener el registro histórico
+        
+        # 4. Eliminar el apadrinamiento
         if storage.delete('apadrinamientos', pk):
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response({'error': 'Apadrinamiento no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+            sync.sync_entity('apadrinamientos', pk)
+            print(f"[CANCELAR ASIGNACION] Apadrinamiento {pk} eliminado exitosamente")
+            return Response(
+                {'message': 'Asignación cancelada exitosamente'},
+                status=status.HTTP_200_OK
+            )
+        
+        return Response({'error': 'Error al eliminar apadrinamiento'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class EntregasViewSet(viewsets.ViewSet):

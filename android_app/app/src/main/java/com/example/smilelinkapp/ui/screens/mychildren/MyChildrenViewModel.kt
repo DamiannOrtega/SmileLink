@@ -63,7 +63,12 @@ class MyChildrenViewModel(application: Application) : AndroidViewModel(applicati
                 
                 val apadrinamientos = apadrinamientosResult.getOrNull() ?: emptyList()
                 
-                if (apadrinamientos.isEmpty()) {
+                // Filter only active sponsorships
+                val activeApadrinamientos = apadrinamientos.filter { 
+                    it.estadoApadrinamientoRegistro == "Activo" 
+                }
+                
+                if (activeApadrinamientos.isEmpty()) {
                     _uiState.value = MyChildrenUiState.Empty
                     return@launch
                 }
@@ -71,7 +76,7 @@ class MyChildrenViewModel(application: Application) : AndroidViewModel(applicati
                 // Get details for each sponsored child
                 val childrenInfo = mutableListOf<SponsoredChildInfo>()
                 
-                for (apadrinamiento in apadrinamientos) {
+                for (apadrinamiento in activeApadrinamientos) {
                     val ninoResult = repository.getNino(apadrinamiento.idNino)
                     val entregasResult = repository.getEntregasForApadrinamiento(apadrinamiento.idApadrinamiento)
                     

@@ -25,6 +25,22 @@ object AppConfig {
         }
     
     /**
+     * Frontend URL for static assets (logo, etc.)
+     */
+    val FRONTEND_URL: String
+        get() = if (isEmulator()) {
+            "http://10.0.2.2:8080"  // Emulator
+        } else {
+            "http://192.168.193.205:8080"  // Physical device (frontend server IP)
+        }
+    
+    /**
+     * Logo URL
+     */
+    val LOGO_URL: String
+        get() = "$FRONTEND_URL/logo.png"
+    
+    /**
      * Enable network logging for debugging
      */
     const val DEBUG_NETWORK = true

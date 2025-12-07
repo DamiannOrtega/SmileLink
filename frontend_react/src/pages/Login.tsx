@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,8 +47,13 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-secondary/5 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-            <Heart className="h-8 w-8 text-primary-foreground" />
+          {/* LOGO LOGIN - Cambiar tamaño: h-32 w-32 (actual) a h-X w-X donde X es el tamaño deseado */}
+          <div className="mx-auto flex h-32 w-32 items-center justify-center rounded-2xl overflow-hidden">
+            <img 
+              src="/logo.png" 
+              alt="SmileLink Logo" 
+              className="h-full w-full object-contain"
+            />
           </div>
           <div>
             <CardTitle className="text-2xl">SmileLink Admin</CardTitle>

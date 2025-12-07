@@ -8,6 +8,7 @@ import com.example.smilelinkapp.data.local.SessionManager
 import com.example.smilelinkapp.data.model.LoginRequest
 import com.example.smilelinkapp.data.model.RegisterRequest
 import com.example.smilelinkapp.data.model.Padrino
+import com.example.smilelinkapp.utils.ValidationUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -31,14 +32,25 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
      * Login with email and password
      */
     fun login(email: String, password: String) {
-        // Validate inputs
-        if (email.isBlank() || password.isBlank()) {
-            _uiState.value = AuthUiState.Error("Por favor completa todos los campos")
+        // Validate email
+        if (email.isBlank()) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.EMAIL_REQUIRED)
             return
         }
         
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            _uiState.value = AuthUiState.Error("Email inválido")
+        if (!ValidationUtils.isValidEmail(email)) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.EMAIL_INVALID)
+            return
+        }
+        
+        // Validate password
+        if (password.isBlank()) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORD_REQUIRED)
+            return
+        }
+        
+        if (password.length < 6) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORD_TOO_SHORT)
             return
         }
         
@@ -77,29 +89,91 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         telefono: String,
         direccion: String
     ) {
-        // Validate inputs
-        if (nombre.isBlank() || email.isBlank() || password.isBlank() || direccion.isBlank()) {
-            _uiState.value = AuthUiState.Error("Por favor completa todos los campos obligatorios")
+        // Validate nombre
+        if (nombre.isBlank()) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.NAME_REQUIRED)
             return
         }
         
-        if (nombre.length < 3) {
-            _uiState.value = AuthUiState.Error("El nombre debe tener al menos 3 caracteres")
+        if (!ValidationUtils.isValidName(nombre)) {
+            val trimmedName = nombre.trim()
+            when {
+                trimmedName.length < 2 -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.NAME_TOO_SHORT)
+                }
+                trimmedName.length > 100 -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.NAME_TOO_LONG)
+                }
+                else -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.NAME_INVALID)
+                }
+            }
             return
         }
         
-        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
-            _uiState.value = AuthUiState.Error("Email inválido")
+        // Validate email
+        if (email.isBlank()) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.EMAIL_REQUIRED)
             return
         }
         
-        if (password.length < 6) {
-            _uiState.value = AuthUiState.Error("La contraseña debe tener al menos 6 caracteres")
+        if (!ValidationUtils.isValidEmail(email)) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.EMAIL_INVALID)
             return
         }
         
+        // Validate password
+        if (password.isBlank()) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORD_REQUIRED)
+            return
+        }
+        
+        if (!ValidationUtils.isValidPassword(password)) {
+            when {
+                password.length < 6 -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORD_TOO_SHORT)
+                }
+                password.length > 50 -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORD_TOO_LONG)
+                }
+                else -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORD_TOO_SHORT)
+                }
+            }
+            return
+        }
+        
+        // Validate confirm password
         if (password != confirmPassword) {
-            _uiState.value = AuthUiState.Error("Las contraseñas no coinciden")
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PASSWORDS_DONT_MATCH)
+            return
+        }
+        
+        // Validate telefono (opcional, pero si se proporciona debe ser válido)
+        if (telefono.isNotBlank() && !ValidationUtils.isValidPhone(telefono)) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.PHONE_INVALID)
+            return
+        }
+        
+        // Validate direccion
+        if (direccion.isBlank()) {
+            _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.ADDRESS_REQUIRED)
+            return
+        }
+        
+        if (!ValidationUtils.isValidAddress(direccion)) {
+            val trimmedAddress = direccion.trim()
+            when {
+                trimmedAddress.length < 5 -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.ADDRESS_TOO_SHORT)
+                }
+                trimmedAddress.length > 200 -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.ADDRESS_TOO_LONG)
+                }
+                else -> {
+                    _uiState.value = AuthUiState.Error(ValidationUtils.ErrorMessages.ADDRESS_TOO_SHORT)
+                }
+            }
             return
         }
         
@@ -107,12 +181,19 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         
         viewModelScope.launch {
             try {
+                // Limpiar teléfono (solo números)
+                val cleanTelefono = if (telefono.isNotBlank()) {
+                    ValidationUtils.cleanPhone(telefono)
+                } else {
+                    ""
+                }
+                
                 val request = RegisterRequest(
                     nombre = nombre.trim(),
-                    email = email.trim(),
+                    email = email.trim().lowercase(),
                     password = password,
                     direccion = direccion.trim(),
-                    telefono = telefono.trim()
+                    telefono = cleanTelefono
                 )
                 
                 val response = api.register(request)
