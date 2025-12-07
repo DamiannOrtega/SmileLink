@@ -21,7 +21,7 @@ class HDFSClient:
     """Cliente para replicar archivos a HDFS"""
     
     def __init__(self):
-        self.namenode_url = os.getenv('HDFS_NAMENODE_URL', 'http://192.168.1.73:9870')
+        self.namenode_url = os.getenv('HDFS_NAMENODE_URL', 'http://192.168.193.26:9870')
         self.user = os.getenv('HDFS_USER', 'hadoop')
         self.replication_path = os.getenv('HDFS_REPLICATION_PATH', '/smilelink/data')
         self.replication_factor = int(os.getenv('HDFS_REPLICATION_FACTOR', '2'))
