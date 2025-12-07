@@ -344,9 +344,15 @@ export default function NinoDetalle() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Estado</p>
-                <Badge variant={nino.estado_apadrinamiento === "Disponible" ? "destructive" : "default"}>
-                  {nino.estado_apadrinamiento}
-                </Badge>
+                {nino.estado_apadrinamiento === "Disponible" ? (
+                  <Badge variant="secondary" className="bg-green-500 hover:bg-green-600 text-white border-green-600">
+                    {nino.estado_apadrinamiento}
+                  </Badge>
+                ) : (
+                  <Badge variant="default">
+                    {nino.estado_apadrinamiento}
+                  </Badge>
+                )}
               </div>
               {canBeLiberated() && (
                 <div className="pt-2 border-t">

@@ -77,11 +77,14 @@ export default function NinosRefactored() {
     });
 
     const getEstadoBadge = (estado: Nino["estado_apadrinamiento"]) => {
-        const variants: Record<Nino["estado_apadrinamiento"], "default" | "destructive"> = {
-            "Disponible": "destructive",
-            "Apadrinado": "default",
-        };
-        return <Badge variant={variants[estado]}>{estado}</Badge>;
+        if (estado === "Disponible") {
+            return (
+                <Badge variant="secondary" className="bg-green-500 hover:bg-green-600 text-white border-green-600">
+                    {estado}
+                </Badge>
+            );
+        }
+        return <Badge variant="default">{estado}</Badge>;
     };
 
     const handleDelete = (id: string) => {

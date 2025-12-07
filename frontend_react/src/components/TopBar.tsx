@@ -43,9 +43,6 @@ export function TopBar() {
                 </Avatar>
                 <div className="hidden text-left md:block">
                   <p className="text-sm font-medium">Admin Sistema</p>
-                  <Badge variant="secondary" className="text-xs">
-                    Superadmin
-                  </Badge>
                 </div>
                 <ChevronDown className="h-4 w-4 opacity-50" />
               </Button>
