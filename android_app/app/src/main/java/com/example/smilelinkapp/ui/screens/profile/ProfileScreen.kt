@@ -22,6 +22,8 @@ import com.example.smilelinkapp.data.local.SessionManager
 import com.example.smilelinkapp.data.repository.SmileLinkRepository
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +32,15 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
+    
+    val googleSignInClient = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("1017900179196-cn3n9691g2o64iifbii476t82s8h72ca.apps.googleusercontent.com")
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(context, gso)
+    }
+
     val repository = remember { SmileLinkRepository() }
     val scope = rememberCoroutineScope()
     val padrino = sessionManager.getPadrino()
@@ -269,8 +280,10 @@ fun ProfileScreen(
             // Logout button
             Button(
                 onClick = {
-                    sessionManager.clearSession()
-                    onLogout()
+                    googleSignInClient.signOut().addOnCompleteListener {
+                        sessionManager.clearSession()
+                        onLogout()
+                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
