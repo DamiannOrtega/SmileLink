@@ -48,3 +48,24 @@ def save_delivery_evidence(entrega_id, file_obj):
             destination.write(chunk)
 
     return f"/media/evidence/{filename}"
+
+def save_padrino_profile_image(padrino_id, file_obj):
+    """
+    Guarda foto de perfil del padrino en local_data/profiles/
+    """
+    profiles_dir = os.path.join(settings.BASE_DIR, 'local_data', 'profiles')
+    os.makedirs(profiles_dir, exist_ok=True)
+
+    timestamp = int(time.time())
+    # Keep original extension if possible or default to jpg
+    original_name = file_obj.name or ''
+    ext = original_name.split('.')[-1] if '.' in original_name else 'jpg'
+    
+    filename = f"{padrino_id}_{timestamp}.{ext}"
+    file_path = os.path.join(profiles_dir, filename)
+
+    with open(file_path, 'wb+') as destination:
+        for chunk in file_obj.chunks():
+            destination.write(chunk)
+
+    return f"/media/profiles/{filename}"

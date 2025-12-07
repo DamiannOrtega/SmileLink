@@ -37,6 +37,7 @@ class PadrinoSerializer(serializers.Serializer):
         child=serializers.CharField(),
         default=list
     )
+    foto_perfil = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class ApadrinamientoSerializer(serializers.Serializer):

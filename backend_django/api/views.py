@@ -202,6 +202,32 @@ class PadrinosViewSet(viewsets.ViewSet):
         print(f"[PADRINO UPDATE] Response data: {response_data}")
         return Response(response_data)
     
+    @action(detail=True, methods=['post'], url_path='upload_profile_image', parser_classes=[MultiPartParser, FormParser])
+    def upload_profile_image(self, request, pk=None):
+        """Sube foto de perfil del padrino"""
+        padrino = storage.load('padrinos', pk)
+        if not padrino:
+            return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({'error': 'No se proporcionó ningún archivo'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            from .file_utils import save_padrino_profile_image
+            profile_url = save_padrino_profile_image(pk, file_obj)
+            
+            # Update Padrino record
+            padrino['foto_perfil'] = profile_url
+            
+            storage.update('padrinos', pk, padrino)
+            sync.sync_entity('padrinos', pk)
+            
+            return Response({'status': 'Foto de perfil subida', 'foto_perfil': profile_url})
+        except Exception as e:
+            print(f"Error uploading profile image: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     def destroy(self, request, pk=None):
         if storage.delete('padrinos', pk):
             return Response(status=status.HTTP_204_NO_CONTENT)
