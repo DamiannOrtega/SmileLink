@@ -1,12 +1,12 @@
-# SmileLink 🎁
+# SmileLink 
 
 Sistema integral de gestión de apadrinamientos para niños, desarrollado con Django (Backend), React (Frontend Web) y Kotlin/Jetpack Compose (Android App).
 
-## 📋 Descripción
+## Descripción
 
 SmileLink es una plataforma que conecta padrinos con niños necesitados, facilitando el proceso de apadrinamiento, gestión de entregas de regalos y seguimiento de eventos especiales.
 
-## 🏗️ Arquitectura del Proyecto
+## Arquitectura del Proyecto
 
 ```
 SmileLink/
@@ -16,7 +16,7 @@ SmileLink/
 └── _docs/               # Documentación del proyecto
 ```
 
-## 🚀 Tecnologías
+## Tecnologías
 
 ### Backend (Django)
 - **Framework**: Django 4.2.7 + Django REST Framework
@@ -37,34 +37,34 @@ SmileLink/
 - **Networking**: Retrofit + OkHttp
 - **Navegación**: Jetpack Navigation Compose
 
-## 📱 Características
+## Características
 
 ### Aplicación Android
-- ✅ Autenticación (Registro, Login, Logout)
-- ✅ Explorar niños disponibles para apadrinar
-- ✅ Crear apadrinamientos
-- ✅ Ver mis ahijados
-- ✅ Mapa de puntos de entrega
-- ✅ Perfil de usuario
-- ✅ Sesión persistente
+- Autenticación (Registro, Login, Logout)
+- Explorar niños disponibles para apadrinar
+- Crear apadrinamientos
+- Ver mis ahijados
+- Mapa de puntos de entrega
+- Perfil de usuario
+- Sesión persistente
 
 ### Frontend Web
-- ✅ Dashboard con KPIs
-- ✅ Gestión de niños
-- ✅ Gestión de padrinos
-- ✅ Gestión de apadrinamientos
-- ✅ Gestión de entregas
-- ✅ Gestión de puntos de entrega
-- ✅ Gestión de eventos
+- Dashboard con KPIs
+- Gestión de niños
+- Gestión de padrinos
+- Gestión de apadrinamientos
+- Gestión de entregas
+- Gestión de puntos de entrega
+- Gestión de eventos
 
 ### Backend API
-- ✅ RESTful API completa
-- ✅ Sistema de almacenamiento encriptado
-- ✅ Sincronización con NFS/HDFS
-- ✅ Autenticación de usuarios
-- ✅ CORS configurado
+- RESTful API completa
+- Sistema de almacenamiento encriptado
+- Sincronización con NFS/HDFS
+- Autenticación de usuarios
+- CORS configurado
 
-## 🛠️ Instalación y Configuración
+## Instalación y Configuración
 
 ### Backend Django
 
@@ -93,15 +93,6 @@ npm run dev
 
 ## 🔧 Configuración
 
-### Backend (.env)
-```env
-USE_MOCK=False
-LOCAL_STORAGE_PATH=./local_data
-USE_NFS=False
-NFS_DATA_PATH=/mnt/nfs/smilelink/data
-HDFS_NAMENODE=http://192.168.1.73:9870
-HDFS_BASE_PATH=/smilelink/data
-```
 
 ### Android (AppConfig.kt)
 ```kotlin
@@ -121,23 +112,13 @@ object AppConfig {
 - **Puntos de Entrega**: Ubicaciones para entrega de regalos
 - **Eventos**: Eventos especiales (Navidad, Día del Niño, etc.)
 
-## 🤝 Contribuir
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
 
-## 📝 Licencia
+## Autores
 
-Este proyecto está bajo la Licencia MIT.
+- **Juan Damián Ortega De Luna** -
+- **Alan Gael Gallardo Jimenez**
+- **Carlos Enrique Blanco Ortiz**
+- **Alicia Jazmín Díaz Laguna**
+- 
 
-## 👥 Autores
-
-- **Damián Ortega** - Desarrollo Full Stack
-
-## 🙏 Agradecimientos
-
-- A todos los que contribuyen a hacer sonreír a los niños
-- Comunidad de código abierto
