@@ -116,9 +116,7 @@ object AppConfig {
 
 ## Autores
 
-- **Juan Damián Ortega De Luna** -
+- **Juan Damián Ortega De Luna** 
 - **Alan Gael Gallardo Jimenez**
 - **Carlos Enrique Blanco Ortiz**
 - **Alicia Jazmín Díaz Laguna**
-- 
-
