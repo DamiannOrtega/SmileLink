@@ -382,6 +382,8 @@ const delay = (ms: number = 500): Promise<void> => {
 
 /**
  * Wrapper genérico para peticiones HTTP
+ * Maneja automáticamente las respuestas paginadas de Django REST Framework
+ * (que retornan {count, next, previous, results:[...]})
  */
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -396,8 +398,110 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+
+  // Django REST Framework retorna respuestas paginadas: {count, next, previous, results:[...]}
+  // El frontend espera arrays directos, así que extraemos .results si existe
+  if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
+    return data.results as T;
+  }
+
+  return data as T;
 }
+
+
+// ============================================================================
+// NORMALIZADORES — Mapean campos del nuevo Django API al formato del frontend
+// Django retorna: id, id_padrino_actual_id, etc.
+// Frontend espera: id_padrino, id_nino, historial_apadrinamiento_ids, etc.
+// ============================================================================
+
+const normNino = (n: any): Nino => ({
+  id_nino: String(n.id),
+  nombre: n.nombre || '',
+  edad: n.edad ?? 0,
+  genero: n.genero,
+  descripcion: n.descripcion || '',
+  necesidades: Array.isArray(n.necesidades) ? n.necesidades : [],
+  id_padrino_actual: n.id_padrino_actual != null ? String(n.id_padrino_actual) : undefined,
+  estado_apadrinamiento: n.estado_apadrinamiento,
+  fecha_apadrinamiento_actual: n.fecha_apadrinamiento_actual ?? undefined,
+});
+
+const normPadrino = (p: any): Padrino => ({
+  id_padrino: String(p.id),
+  nombre: p.nombre || '',
+  email: p.email,
+  telefono: p.telefono || '',
+  direccion: p.direccion || '',
+  fecha_registro: p.fecha_registro || '',
+  id_google_auth: p.id_google_auth ?? undefined,
+  historial_apadrinamiento_ids: [], // Se obtiene por separado si se necesita
+});
+
+const normApadrinamiento = (a: any): Apadrinamiento => ({
+  id_apadrinamiento: String(a.id),
+  id_padrino: String(a.id_padrino),
+  id_nino: String(a.id_nino),
+  fecha_inicio: a.fecha_inicio,
+  fecha_fin: a.fecha_fin ?? undefined,
+  tipo_apadrinamiento: a.tipo_apadrinamiento,
+  estado_apadrinamiento_registro: a.estado_apadrinamiento_registro,
+  entregas_ids: [],
+});
+
+const normEntrega = (e: any): Entrega => ({
+  id_entrega: String(e.id),
+  id_apadrinamiento: String(e.id_apadrinamiento),
+  descripcion_regalo: e.descripcion_regalo || '',
+  fecha_programada: e.fecha_programada,
+  fecha_entrega_real: e.fecha_entrega_real ?? undefined,
+  estado_entrega: e.estado_entrega,
+  observaciones: e.observaciones || '',
+  id_punto_entrega: String(e.id_punto_entrega),
+  evidencia_foto_path: undefined,
+});
+
+const normSolicitud = (s: any): SolicitudRegalo => ({
+  id_solicitud: String(s.id),
+  id_nino: String(s.id_nino),
+  id_padrino_interesado: s.id_padrino_interesado != null ? String(s.id_padrino_interesado) : undefined,
+  descripcion_solicitud: s.descripcion_solicitud || '',
+  fecha_solicitud: s.fecha_solicitud,
+  fecha_cierre: s.fecha_cierre ?? undefined,
+  estado_solicitud: s.estado_solicitud,
+  id_entrega_asociada: s.id_entrega_asociada != null ? String(s.id_entrega_asociada) : undefined,
+});
+
+const normPuntoEntrega = (p: any): PuntoEntrega => ({
+  id_punto_entrega: String(p.id),
+  nombre_punto: p.nombre_punto,
+  direccion_fisica: p.direccion_fisica,
+  latitud: Number(p.latitud),
+  longitud: Number(p.longitud),
+  horario_atencion: p.horario_atencion || '',
+  contacto_referencia: p.contacto_referencia || '',
+  estado_punto: p.estado_punto,
+});
+
+const normEvento = (e: any): Evento => ({
+  id_evento: String(e.id),
+  nombre_evento: e.nombre_evento,
+  tipo_evento: e.tipo_evento,
+  fecha_inicio: e.fecha_inicio,
+  fecha_fin: e.fecha_fin,
+  estado_evento: e.estado_evento,
+  descripcion: e.descripcion ?? undefined,
+});
+
+const normAdministrador = (a: any): Administrador => ({
+  id_admin: String(a.id),
+  nombre: a.nombre,
+  email: a.email,
+  password_hash: '',
+  fecha_registro: a.created_at ? a.created_at.split('T')[0] : '',
+  rol: a.rol,
+});
 
 // ============================================================================
 // SERVICIOS POR ENTIDAD
@@ -412,7 +516,8 @@ export const NinosService = {
       await delay();
       return [...MOCK_NINOS];
     }
-    return fetchAPI<Nino[]>("/ninos/");
+    const raw = await fetchAPI<any[]>("/ninos/");
+    return raw.map(normNino);
   },
 
   async getById(id: string): Promise<Nino | null> {
@@ -420,7 +525,8 @@ export const NinosService = {
       await delay();
       return MOCK_NINOS.find((n) => n.id_nino === id) || null;
     }
-    return fetchAPI<Nino>(`/ninos/${id}/`);
+    const raw = await fetchAPI<any>(`/ninos/${id}/`);
+    return normNino(raw);
   },
 
   async create(data: Omit<Nino, "id_nino">): Promise<Nino> {
@@ -473,7 +579,8 @@ export const PadrinosService = {
       await delay();
       return [...MOCK_PADRINOS];
     }
-    return fetchAPI<Padrino[]>("/padrinos/");
+    const raw = await fetchAPI<any[]>("/padrinos/");
+    return raw.map(normPadrino);
   },
 
   async getById(id: string): Promise<Padrino | null> {
@@ -481,7 +588,8 @@ export const PadrinosService = {
       await delay();
       return MOCK_PADRINOS.find((p) => p.id_padrino === id) || null;
     }
-    return fetchAPI<Padrino>(`/padrinos/${id}/`);
+    const raw = await fetchAPI<any>(`/padrinos/${id}/`);
+    return normPadrino(raw);
   },
 
   async create(data: Omit<Padrino, "id_padrino">): Promise<Padrino> {
@@ -534,7 +642,8 @@ export const ApadrinamientosService = {
       await delay();
       return [...MOCK_APADRINAMIENTOS];
     }
-    return fetchAPI<Apadrinamiento[]>("/apadrinamientos/");
+    const raw = await fetchAPI<any[]>("/apadrinamientos/");
+    return raw.map(normApadrinamiento);
   },
 
   async getById(id: string): Promise<Apadrinamiento | null> {
@@ -542,7 +651,8 @@ export const ApadrinamientosService = {
       await delay();
       return MOCK_APADRINAMIENTOS.find((a) => a.id_apadrinamiento === id) || null;
     }
-    return fetchAPI<Apadrinamiento>(`/apadrinamientos/${id}/`);
+    const raw = await fetchAPI<any>(`/apadrinamientos/${id}/`);
+    return normApadrinamiento(raw);
   },
 
   async create(data: Omit<Apadrinamiento, "id_apadrinamiento">): Promise<Apadrinamiento> {
@@ -590,7 +700,8 @@ export const ApadrinamientosService = {
       await delay();
       return MOCK_APADRINAMIENTOS.filter((a) => a.id_padrino === id_padrino);
     }
-    return fetchAPI<Apadrinamiento[]>(`/apadrinamientos/?padrino=${id_padrino}`);
+    const raw = await fetchAPI<any[]>(`/apadrinamientos/?padrino=${id_padrino}`);
+    return raw.map(normApadrinamiento);
   },
 
   async getByNino(id_nino: string): Promise<Apadrinamiento[]> {
@@ -598,7 +709,8 @@ export const ApadrinamientosService = {
       await delay();
       return MOCK_APADRINAMIENTOS.filter((a) => a.id_nino === id_nino);
     }
-    return fetchAPI<Apadrinamiento[]>(`/apadrinamientos/?nino=${id_nino}`);
+    const raw = await fetchAPI<any[]>(`/apadrinamientos/?nino=${id_nino}`);
+    return raw.map(normApadrinamiento);
   },
 };
 
@@ -611,7 +723,8 @@ export const EntregasService = {
       await delay();
       return [...MOCK_ENTREGAS];
     }
-    return fetchAPI<Entrega[]>("/entregas/");
+    const raw = await fetchAPI<any[]>("/entregas/");
+    return raw.map(normEntrega);
   },
 
   async getById(id: string): Promise<Entrega | null> {
@@ -619,7 +732,8 @@ export const EntregasService = {
       await delay();
       return MOCK_ENTREGAS.find((e) => e.id_entrega === id) || null;
     }
-    return fetchAPI<Entrega>(`/entregas/${id}/`);
+    const raw = await fetchAPI<any>(`/entregas/${id}/`);
+    return normEntrega(raw);
   },
 
   async create(data: Omit<Entrega, "id_entrega">): Promise<Entrega> {
@@ -667,7 +781,8 @@ export const EntregasService = {
       await delay();
       return MOCK_ENTREGAS.filter((e) => e.id_apadrinamiento === id_apadrinamiento);
     }
-    return fetchAPI<Entrega[]>(`/entregas/?apadrinamiento=${id_apadrinamiento}`);
+    const raw = await fetchAPI<any[]>(`/entregas/?apadrinamiento=${id_apadrinamiento}`);
+    return raw.map(normEntrega);
   },
 };
 
@@ -680,7 +795,8 @@ export const SolicitudesService = {
       await delay();
       return [...MOCK_SOLICITUDES];
     }
-    return fetchAPI<SolicitudRegalo[]>("/solicitudes/");
+    const raw = await fetchAPI<any[]>("/solicitudes/");
+    return raw.map(normSolicitud);
   },
 
   async getById(id: string): Promise<SolicitudRegalo | null> {
@@ -688,7 +804,8 @@ export const SolicitudesService = {
       await delay();
       return MOCK_SOLICITUDES.find((s) => s.id_solicitud === id) || null;
     }
-    return fetchAPI<SolicitudRegalo>(`/solicitudes/${id}/`);
+    const raw = await fetchAPI<any>(`/solicitudes/${id}/`);
+    return normSolicitud(raw);
   },
 
   async create(data: Omit<SolicitudRegalo, "id_solicitud">): Promise<SolicitudRegalo> {
@@ -736,7 +853,8 @@ export const SolicitudesService = {
       await delay();
       return MOCK_SOLICITUDES.filter((s) => s.id_nino === id_nino);
     }
-    return fetchAPI<SolicitudRegalo[]>(`/solicitudes/?nino=${id_nino}`);
+    const raw = await fetchAPI<any[]>(`/solicitudes/?nino=${id_nino}`);
+    return raw.map(normSolicitud);
   },
 };
 
@@ -749,7 +867,8 @@ export const PuntosEntregaService = {
       await delay();
       return [...MOCK_PUNTOS_ENTREGA];
     }
-    return fetchAPI<PuntoEntrega[]>("/puntos-entrega/");
+    const raw = await fetchAPI<any[]>("/puntos-entrega/");
+    return raw.map(normPuntoEntrega);
   },
 
   async getById(id: string): Promise<PuntoEntrega | null> {
@@ -757,7 +876,8 @@ export const PuntosEntregaService = {
       await delay();
       return MOCK_PUNTOS_ENTREGA.find((p) => p.id_punto_entrega === id) || null;
     }
-    return fetchAPI<PuntoEntrega>(`/puntos-entrega/${id}/`);
+    const raw = await fetchAPI<any>(`/puntos-entrega/${id}/`);
+    return normPuntoEntrega(raw);
   },
 
   async create(data: Omit<PuntoEntrega, "id_punto_entrega">): Promise<PuntoEntrega> {
@@ -805,7 +925,8 @@ export const PuntosEntregaService = {
       await delay();
       return MOCK_PUNTOS_ENTREGA.filter((p) => p.estado_punto === "Activo");
     }
-    return fetchAPI<PuntoEntrega[]>("/puntos-entrega/?activo=true");
+    const raw = await fetchAPI<any[]>("/puntos-entrega/?activo=true");
+    return raw.map(normPuntoEntrega);
   },
 };
 
@@ -818,7 +939,8 @@ export const AdministradoresService = {
       await delay();
       return [...MOCK_ADMINISTRADORES];
     }
-    return fetchAPI<Administrador[]>("/administradores/");
+    const raw = await fetchAPI<any[]>("/administradores/");
+    return raw.map(normAdministrador);
   },
 
   async getById(id: string): Promise<Administrador | null> {
@@ -826,7 +948,8 @@ export const AdministradoresService = {
       await delay();
       return MOCK_ADMINISTRADORES.find((a) => a.id_admin === id) || null;
     }
-    return fetchAPI<Administrador>(`/administradores/${id}/`);
+    const raw = await fetchAPI<any>(`/administradores/${id}/`);
+    return normAdministrador(raw);
   },
 
   async create(data: Omit<Administrador, "id_admin">): Promise<Administrador> {
@@ -879,7 +1002,8 @@ export const EventosService = {
       await delay();
       return [...MOCK_EVENTOS];
     }
-    return fetchAPI<Evento[]>("/eventos/");
+    const raw = await fetchAPI<any[]>("/eventos/");
+    return raw.map(normEvento);
   },
 
   async getById(id: string): Promise<Evento | null> {
@@ -887,7 +1011,8 @@ export const EventosService = {
       await delay();
       return MOCK_EVENTOS.find((e) => e.id_evento === id) || null;
     }
-    return fetchAPI<Evento>(`/eventos/${id}/`);
+    const raw = await fetchAPI<any>(`/eventos/${id}/`);
+    return normEvento(raw);
   },
 
   async create(data: Omit<Evento, "id_evento">): Promise<Evento> {
@@ -935,7 +1060,8 @@ export const EventosService = {
       await delay();
       return MOCK_EVENTOS.filter((e) => e.estado_evento === "Activo");
     }
-    return fetchAPI<Evento[]>("/eventos/?activo=true");
+    const raw = await fetchAPI<any[]>("/eventos/?activo=true");
+    return raw.map(normEvento);
   },
 };
 
