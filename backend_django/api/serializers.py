@@ -1,145 +1,231 @@
 """
-SmileLink API - Serializers
-Serializers para todas las entidades del sistema
+SmileLink API — Serializers
+ModelSerializers basados en los modelos Django.
+Los campos cifrados (nombre, teléfono, dirección) se exponen como texto plano
+en la API; el cifrado/descifrado ocurre en las views.
 """
 from rest_framework import serializers
-from datetime import date
+from .models import (
+    Administrador, Padrino, Nino, PuntoEntrega,
+    Evento, Apadrinamiento, Entrega, Solicitud
+)
+from utils.encryption import descifrar_campo
 
 
-class NinoSerializer(serializers.Serializer):
-    """Serializer para Niño"""
-    id_nino = serializers.CharField(read_only=True)
-    nombre = serializers.CharField(max_length=200)
-    edad = serializers.IntegerField(min_value=0, max_value=18)
-    genero = serializers.ChoiceField(choices=['Masculino', 'Femenino'])
-    descripcion = serializers.CharField()
-    necesidades = serializers.ListField(child=serializers.CharField())
-    id_padrino_actual = serializers.CharField(required=False, allow_null=True)
-    estado_apadrinamiento = serializers.ChoiceField(
-        choices=['Disponible', 'Apadrinado'],
-        default='Disponible'
-    )
-    fecha_apadrinamiento_actual = serializers.DateField(required=False, allow_null=True)
+# ──────────────────────────────────────────────────────────────────────────────
+# ADMINISTRADOR
+# ──────────────────────────────────────────────────────────────────────────────
+
+class AdministradorSerializer(serializers.ModelSerializer):
+    """Serializer para Administrador. Sin campos cifrados."""
+    class Meta:
+        model   = Administrador
+        fields  = ['id', 'nombre', 'email', 'rol', 'activo', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class PadrinoSerializer(serializers.Serializer):
-    """Serializer para Padrino"""
-    id_padrino = serializers.CharField(read_only=True)
-    nombre = serializers.CharField(max_length=200)
-    email = serializers.EmailField()
-    password_hash = serializers.CharField(required=False, write_only=True)
-    fecha_registro = serializers.DateField(default=date.today)
-    id_google_auth = serializers.CharField(required=False, allow_null=True)
-    direccion = serializers.CharField(required=False, allow_blank=True)
-    telefono = serializers.CharField(required=False, allow_blank=True)
-    historial_apadrinamiento_ids = serializers.ListField(
-        child=serializers.CharField(),
-        default=list
-    )
+# ──────────────────────────────────────────────────────────────────────────────
+# PADRINO
+# ──────────────────────────────────────────────────────────────────────────────
+
+class PadrinoSerializer(serializers.ModelSerializer):
+    """
+    Serializer para Padrino.
+    - nombre, telefono, direccion: campos virtuales (texto plano en API, cifrado en BD)
+    - password_hash: write-only, nunca se devuelve en la respuesta
+    """
+    nombre    = serializers.SerializerMethodField()
+    telefono  = serializers.SerializerMethodField()
+    direccion = serializers.SerializerMethodField()
+
+    # Campos de escritura (entrada de la API)
+    nombre_input    = serializers.CharField(write_only=True, required=False, source='nombre')
+    telefono_input  = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    direccion_input = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    password        = serializers.CharField(write_only=True, required=False, allow_blank=True)
+
+    class Meta:
+        model  = Padrino
+        fields = [
+            'id', 'nombre', 'nombre_input',
+            'email',
+            'telefono', 'telefono_input',
+            'direccion', 'direccion_input',
+            'password',
+            'id_google_auth', 'fecha_registro', 'activo',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'fecha_registro', 'created_at', 'updated_at']
+
+    def get_nombre(self, obj):
+        return descifrar_campo(obj.nombre_cifrado)
+
+    def get_telefono(self, obj):
+        return descifrar_campo(obj.telefono_cifrado)
+
+    def get_direccion(self, obj):
+        return descifrar_campo(obj.direccion_cifrada)
 
 
-class ApadrinamientoSerializer(serializers.Serializer):
-    """Serializer para Apadrinamiento"""
-    id_apadrinamiento = serializers.CharField(required=False)
-    id_padrino = serializers.CharField()
-    id_nino = serializers.CharField()
-    fecha_inicio = serializers.DateField(default=date.today)
-    fecha_fin = serializers.DateField(required=False, allow_null=True)
-    tipo_apadrinamiento = serializers.ChoiceField(
-        choices=['Elección Padrino', 'Asignación Automática', 'Solicitud Niño'],
-        default='Elección Padrino'
-    )
-    estado_apadrinamiento_registro = serializers.ChoiceField(
-        choices=['Activo', 'Finalizado'],
-        default='Activo'
-    )
-    entregas_ids = serializers.ListField(
-        child=serializers.CharField(),
-        default=list
-    )
+class PadrinoListSerializer(serializers.ModelSerializer):
+    """Versión liviana para listados (sin descifrar todos los campos)."""
+    nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Padrino
+        fields = ['id', 'nombre', 'email', 'activo', 'fecha_registro']
+
+    def get_nombre(self, obj):
+        return descifrar_campo(obj.nombre_cifrado)
 
 
-class EntregaSerializer(serializers.Serializer):
-    """Serializer para Entrega"""
-    id_entrega = serializers.CharField(read_only=True)
-    id_apadrinamiento = serializers.CharField()
-    descripcion_regalo = serializers.CharField()
-    fecha_programada = serializers.DateField()
-    fecha_entrega_real = serializers.DateField(required=False, allow_null=True)
-    estado_entrega = serializers.ChoiceField(
-        choices=['Pendiente', 'En Proceso', 'Entregado'],
-        default='Pendiente'
-    )
-    observaciones = serializers.CharField(required=False, allow_blank=True)
-    id_punto_entrega = serializers.CharField()
-    evidencia_foto_path = serializers.CharField(required=False, allow_null=True)
+# ──────────────────────────────────────────────────────────────────────────────
+# NIÑO
+# ──────────────────────────────────────────────────────────────────────────────
+
+class NinoSerializer(serializers.ModelSerializer):
+    """
+    Serializer para Niño.
+    - nombre: campo virtual (texto plano en API, cifrado en BD)
+    """
+    nombre        = serializers.SerializerMethodField()
+    nombre_input  = serializers.CharField(write_only=True, required=False)
+
+    class Meta:
+        model  = Nino
+        fields = [
+            'id', 'nombre', 'nombre_input',
+            'edad', 'genero', 'descripcion', 'necesidades',
+            'estado_apadrinamiento',
+            'id_padrino_actual', 'fecha_apadrinamiento_actual',
+            'activo', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_nombre(self, obj):
+        return descifrar_campo(obj.nombre_cifrado)
 
 
-class SolicitudRegaloSerializer(serializers.Serializer):
-    """Serializer para Solicitud de Regalo"""
-    id_solicitud = serializers.CharField(read_only=True)
-    id_nino = serializers.CharField()
-    id_padrino_interesado = serializers.CharField(required=False, allow_null=True)
-    descripcion_solicitud = serializers.CharField()
-    fecha_solicitud = serializers.DateField(default=date.today)
-    fecha_cierre = serializers.DateField(required=False, allow_null=True)
-    estado_solicitud = serializers.ChoiceField(
-        choices=['Abierta', 'En Proceso', 'Cumplida'],
-        default='Abierta'
-    )
-    id_entrega_asociada = serializers.CharField(required=False, allow_null=True)
+class NinoListSerializer(serializers.ModelSerializer):
+    """Versión liviana para listados."""
+    nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Nino
+        fields = ['id', 'nombre', 'edad', 'genero', 'estado_apadrinamiento', 'activo']
+
+    def get_nombre(self, obj):
+        return descifrar_campo(obj.nombre_cifrado)
 
 
-class PuntoEntregaSerializer(serializers.Serializer):
-    """Serializer para Punto de Entrega"""
-    id_punto_entrega = serializers.CharField(read_only=True)
-    nombre_punto = serializers.CharField(max_length=200)
-    direccion_fisica = serializers.CharField()
-    latitud = serializers.FloatField()
-    longitud = serializers.FloatField()
-    horario_atencion = serializers.CharField(required=False, allow_blank=True)
-    contacto_referencia = serializers.CharField(required=False, allow_blank=True)
-    estado_punto = serializers.ChoiceField(
-        choices=['Activo', 'Inactivo'],
-        default='Activo'
-    )
+# ──────────────────────────────────────────────────────────────────────────────
+# PUNTO DE ENTREGA
+# ──────────────────────────────────────────────────────────────────────────────
+
+class PuntoEntregaSerializer(serializers.ModelSerializer):
+    """Sin campos cifrados."""
+    class Meta:
+        model  = PuntoEntrega
+        fields = [
+            'id', 'nombre_punto', 'direccion_fisica',
+            'latitud', 'longitud', 'horario_atencion',
+            'contacto_referencia', 'estado_punto',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class AdministradorSerializer(serializers.Serializer):
-    """Serializer para Administrador"""
-    id_admin = serializers.CharField(read_only=True)
-    nombre = serializers.CharField(max_length=200)
-    email = serializers.EmailField()
-    password_hash = serializers.CharField(write_only=True)
-    fecha_registro = serializers.DateField(default=date.today)
-    rol = serializers.ChoiceField(choices=['Gestor', 'Superadmin'])
+# ──────────────────────────────────────────────────────────────────────────────
+# EVENTO
+# ──────────────────────────────────────────────────────────────────────────────
+
+class EventoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Evento
+        fields = [
+            'id', 'nombre_evento', 'tipo_evento',
+            'fecha_inicio', 'fecha_fin', 'estado_evento',
+            'descripcion', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class EventoSerializer(serializers.Serializer):
-    """Serializer para Evento"""
-    id_evento = serializers.CharField(read_only=True)
-    nombre_evento = serializers.CharField(max_length=200)
-    tipo_evento = serializers.ChoiceField(
-        choices=['Navidad', 'Día del Niño', 'Otro']
-    )
-    fecha_inicio = serializers.DateField()
-    fecha_fin = serializers.DateField()
-    estado_evento = serializers.ChoiceField(
-        choices=['Planeado', 'Activo', 'Cerrado'],
-        default='Planeado'
-    )
-    descripcion = serializers.CharField(required=False, allow_blank=True)
+# ──────────────────────────────────────────────────────────────────────────────
+# APADRINAMIENTO
+# ──────────────────────────────────────────────────────────────────────────────
 
+class ApadrinamientoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Apadrinamiento
+        fields = [
+            'id', 'id_padrino', 'id_nino', 'id_evento',
+            'fecha_inicio', 'fecha_fin',
+            'tipo_apadrinamiento', 'estado_apadrinamiento_registro',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'fecha_inicio', 'created_at', 'updated_at']
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ENTREGA
+# ──────────────────────────────────────────────────────────────────────────────
+
+class EntregaSerializer(serializers.ModelSerializer):
+    """
+    observaciones: campo virtual texto plano (almacenado cifrado en BD).
+    evidencias_nosql: se inyecta desde MongoDB en la view de detalle.
+    """
+    observaciones   = serializers.SerializerMethodField()
+    evidencias_nosql = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Entrega
+        fields = [
+            'id', 'id_apadrinamiento', 'id_punto_entrega',
+            'descripcion_regalo', 'fecha_programada', 'fecha_entrega_real',
+            'estado_entrega', 'observaciones',
+            'mongo_evidencia_id', 'evidencias_nosql',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'mongo_evidencia_id', 'created_at', 'updated_at']
+
+    def get_observaciones(self, obj):
+        from utils.encryption import descifrar_campo
+        return descifrar_campo(obj.observaciones_cifradas)
+
+    def get_evidencias_nosql(self, obj):
+        # Solo se incluye en el detalle (inyectado desde la view)
+        return getattr(obj, '_evidencias_nosql', [])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SOLICITUD
+# ──────────────────────────────────────────────────────────────────────────────
+
+class SolicitudSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Solicitud
+        fields = [
+            'id', 'id_nino', 'id_padrino_interesado', 'id_entrega_asociada',
+            'descripcion_solicitud', 'fecha_solicitud', 'fecha_cierre',
+            'estado_solicitud', 'mongo_log_id',
+            'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'fecha_solicitud', 'mongo_log_id', 'created_at', 'updated_at']
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# DASHBOARD KPIs
+# ──────────────────────────────────────────────────────────────────────────────
 
 class DashboardKPIsSerializer(serializers.Serializer):
-    """Serializer para KPIs del Dashboard"""
-    total_ninos = serializers.IntegerField()
-    ninos_disponibles = serializers.IntegerField()
-    ninos_apadrinados = serializers.IntegerField()
-    total_padrinos = serializers.IntegerField()
-    padrinos_activos = serializers.IntegerField()
-    total_apadrinamientos = serializers.IntegerField()
-    apadrinamientos_activos = serializers.IntegerField()
-    total_entregas = serializers.IntegerField()
-    entregas_completadas = serializers.IntegerField()
-    entregas_pendientes = serializers.IntegerField()
+    total_ninos              = serializers.IntegerField()
+    ninos_disponibles        = serializers.IntegerField()
+    ninos_apadrinados        = serializers.IntegerField()
+    total_padrinos           = serializers.IntegerField()
+    padrinos_activos         = serializers.IntegerField()
+    total_apadrinamientos    = serializers.IntegerField()
+    apadrinamientos_activos  = serializers.IntegerField()
+    total_entregas           = serializers.IntegerField()
+    entregas_completadas     = serializers.IntegerField()
+    entregas_pendientes      = serializers.IntegerField()

@@ -1,5 +1,6 @@
 """
-Django settings for smilelink project.
+Django settings for SmileLink — DDBS Parte II
+MySQL Primario (10.66.207.165) + MongoDB (10.66.207.161) + Fernet encryption
 """
 
 from pathlib import Path
@@ -18,13 +19,10 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-change-this-in-production'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '10.0.2.2',  # Android Emulator
-    '192.168.1.87',  # Your PC's local IP
-    '0.0.0.0',
-]
+ALLOWED_HOSTS = os.getenv(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,10.66.207.165,10.0.2.2,0.0.0.0'
+).split(',')
 
 
 # Application definition
@@ -36,20 +34,21 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Third party
     'rest_framework',
     'corsheaders',
-    
+
     # Local apps
     'api',
-    'storage',
     'authentication',
+    # 'storage' eliminado — ya no se usa NFS/HDFS
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS debe ir antes de CommonMiddleware
+    'whitenoise.middleware.WhiteNoiseMiddleware',         # Archivos estáticos en producción
+    'corsheaders.middleware.CorsMiddleware',              # CORS debe ir antes de CommonMiddleware
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,17 +78,51 @@ TEMPLATES = [
 WSGI_APPLICATION = 'smilelink.wsgi.application'
 
 
-# Database - No usamos base de datos SQL, pero Django lo requiere
-# Usamos SQLite solo para Django admin/auth (opcional)
+# ==============================================================================
+# DATABASE — MySQL Primario (10.66.207.165)
+# Réplica en 10.66.207.161 (read-only, no se conecta aquí directamente)
+# ==============================================================================
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE':   'django.db.backends.mysql',
+        'NAME':     os.getenv('MYSQL_DB',       'smilelink'),
+        'USER':     os.getenv('MYSQL_USER',     'smilelink_user'),
+        'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
+        'HOST':     os.getenv('MYSQL_HOST',     '10.66.207.165'),
+        'PORT':     os.getenv('MYSQL_PORT',     '3306'),
+        'OPTIONS': {
+            'charset':  'utf8mb4',
+            'sql_mode': 'STRICT_TRANS_TABLES',
+        },
     }
 }
 
 
-# Password validation
+# ==============================================================================
+# MONGODB — Nodo Secundario (10.66.207.161, Docker puerto 27017)
+# Colecciones: evidencias, bitacora_eventos, historial_notificaciones, cartas
+# ==============================================================================
+
+MONGODB_HOST = os.getenv('MONGODB_HOST', '10.66.207.161')
+MONGODB_PORT = int(os.getenv('MONGODB_PORT', '27017'))
+MONGODB_DB   = os.getenv('MONGODB_DB',   'smilelink_nosql')
+MONGODB_USER = os.getenv('MONGODB_USER', 'smilelink_admin')
+MONGODB_PASS = os.getenv('MONGODB_PASS', '')
+
+
+# ==============================================================================
+# CIFRADO FERNET — Campos sensibles (nombre, teléfono, dirección, observaciones)
+# Generar con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# ==============================================================================
+
+FERNET_KEY = os.getenv('FERNET_KEY', '')
+
+
+# ==============================================================================
+# PASSWORD VALIDATION
+# ==============================================================================
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -106,22 +139,27 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-# Internationalization
+# ==============================================================================
+# INTERNATIONALIZATION
+# ==============================================================================
+
 LANGUAGE_CODE = 'es-mx'
 TIME_ZONE = 'America/Mexico_City'
 USE_I18N = True
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
+# ==============================================================================
+# STATIC & MEDIA FILES
+# ==============================================================================
+
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files (uploads)
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
@@ -135,9 +173,11 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.MultiPartParser',   # Para subida de archivos/evidencias
+        'rest_framework.parsers.FormParser',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Cambiar en producción
+        'rest_framework.permissions.AllowAny',      # Cambiar en producción
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
@@ -150,14 +190,12 @@ REST_FRAMEWORK = {
 # CORS SETTINGS
 # ==============================================================================
 
-# Para desarrollo, permitir todos los orígenes
-# En producción, especificar solo los orígenes permitidos
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOWED_ORIGINS = os.getenv(
         'CORS_ALLOWED_ORIGINS',
-        'http://localhost:8080,http://localhost:8081,http://192.168.1.38:8080,http://192.168.1.38:8081'
+        'http://10.66.207.165:8000,http://localhost:8080,http://localhost:8081'
     ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
@@ -188,8 +226,8 @@ CORS_ALLOW_HEADERS = [
 # JWT SETTINGS
 # ==============================================================================
 
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
-JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+JWT_SECRET_KEY      = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
+JWT_ALGORITHM       = os.getenv('JWT_ALGORITHM', 'HS256')
 JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
 
 
@@ -197,34 +235,8 @@ JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
 # GOOGLE OAUTH SETTINGS
 # ==============================================================================
 
-GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_ID     = os.getenv('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
-
-
-# ==============================================================================
-# STORAGE SETTINGS
-# ==============================================================================
-
-USE_NFS = os.getenv('USE_NFS', 'False').lower() == 'true'
-USE_HDFS_REPLICATION = os.getenv('USE_HDFS_REPLICATION', 'False').lower() == 'true'
-
-# NFS Configuration
-NFS_SERVER = os.getenv('NFS_SERVER', '192.168.1.107')
-NFS_MOUNT_POINT = os.getenv('NFS_MOUNT_POINT', '/mnt/nfs')
-NFS_SHARE_PATH = os.getenv('NFS_SHARE_PATH', '/eData')
-NFS_DATA_PATH = os.getenv('NFS_DATA_PATH', '/mnt/nfs/smilelink/data')
-
-# HDFS Configuration
-HDFS_NAMENODE_URL = os.getenv('HDFS_NAMENODE_URL', 'http://192.168.1.73:9870')
-HDFS_USER = os.getenv('HDFS_USER', 'hadoop')
-HDFS_REPLICATION_PATH = os.getenv('HDFS_REPLICATION_PATH', '/smilelink/data')
-HDFS_REPLICATION_FACTOR = int(os.getenv('HDFS_REPLICATION_FACTOR', '2'))
-
-# Local Storage (for development)
-LOCAL_STORAGE_PATH = os.getenv('LOCAL_STORAGE_PATH', str(BASE_DIR / 'local_data'))
-
-# Encryption
-ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', '')
 
 
 # ==============================================================================
@@ -256,7 +268,7 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'storage': {
+        'api': {
             'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
