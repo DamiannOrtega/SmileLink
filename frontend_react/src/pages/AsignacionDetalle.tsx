@@ -27,6 +27,7 @@ export default function AsignacionDetalle() {
   const [padrino, setPadrino] = useState<Padrino | null>(null);
   const [evento, setEvento] = useState<Evento | null>(null);
   const [loading, setLoading] = useState(true);
+  const [finalizando, setFinalizando] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -56,6 +57,27 @@ export default function AsignacionDetalle() {
       toast.error("Error al cargar detalles de la asignación");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleFinalizar = async () => {
+    if (!id || !asignacion) return;
+    if (asignacion.estado_apadrinamiento_registro === "Finalizado") return;
+
+    try {
+      setFinalizando(true);
+      const hoy = new Date().toISOString().split("T")[0];
+      const actualizada = await ApadrinamientosService.update(id, {
+        estado_apadrinamiento_registro: "Finalizado",
+        fecha_fin: hoy,
+      });
+
+      setAsignacion(actualizada);
+      toast.success("Asignación marcada como finalizada");
+    } catch {
+      toast.error("Error al finalizar la asignación");
+    } finally {
+      setFinalizando(false);
     }
   };
 
@@ -197,7 +219,11 @@ export default function AsignacionDetalle() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Estado</p>
-              <Badge>{asignacion.estado_apadrinamiento_registro}</Badge>
+              <Badge
+                variant={asignacion.estado_apadrinamiento_registro === "Activo" ? "default" : "secondary"}
+              >
+                {asignacion.estado_apadrinamiento_registro}
+              </Badge>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Fecha de Creación</p>
@@ -215,13 +241,28 @@ export default function AsignacionDetalle() {
         </CardHeader>
         <CardContent className="flex gap-4">
           {asignacion.estado_apadrinamiento_registro === "Activo" && (
-            <Button onClick={() => toast.success("Entrega de regalo iniciada")}>
-              Registrar Entrega de Regalo
-            </Button>
+            <>
+              <Button onClick={() => toast.success("Entrega de regalo iniciada")}>
+                Registrar Entrega de Regalo
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleFinalizar}
+                disabled={finalizando}
+              >
+                {finalizando ? "Finalizando..." : "Marcar como Finalizado"}
+              </Button>
+            </>
           )}
-          <Button variant="destructive" onClick={() => toast.error("Asignación inactiva")}>
-            Marcar como Finalizado
-          </Button>
+          {asignacion.estado_apadrinamiento_registro === "Finalizado" && (
+            <p className="text-sm text-muted-foreground">
+              Esta asignación ya está finalizada
+              {asignacion.fecha_fin
+                ? ` (desde ${new Date(asignacion.fecha_fin).toLocaleDateString()})`
+                : ""}
+              .
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

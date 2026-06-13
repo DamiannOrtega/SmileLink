@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -25,6 +24,8 @@ import {
 
 export default function AsignacionNueva() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [ninos, setNinos] = useState<Nino[]>([]);
@@ -34,11 +35,12 @@ export default function AsignacionNueva() {
     id_nino: "",
     id_padrino: "",
     tipo_apadrinamiento: "" as "Aleatorio" | "Elección Padrino" | "",
+    estado_apadrinamiento_registro: "Activo" as "Activo" | "Finalizado",
   });
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [id]);
 
   const loadData = async () => {
     try {
@@ -48,11 +50,36 @@ export default function AsignacionNueva() {
         PadrinosService.getAll()
       ]);
 
-      // Filtrar solo niños disponibles
-      setNinos(ninosData.filter(n => n.estado_apadrinamiento === "Disponible"));
       setPadrinos(padrinosData);
-    } catch (err) {
+
+      if (isEditing && id) {
+        const asignacion = await ApadrinamientosService.getById(id);
+        if (!asignacion) {
+          toast.error("Asignación no encontrada");
+          navigate("/asignaciones");
+          return;
+        }
+
+        const ninoActual = ninosData.find((n) => n.id_nino === asignacion.id_nino);
+        const disponibles = ninosData.filter((n) => n.estado_apadrinamiento === "Disponible");
+        const ninosParaSelect =
+          ninoActual && !disponibles.some((n) => n.id_nino === ninoActual.id_nino)
+            ? [ninoActual, ...disponibles]
+            : disponibles;
+
+        setNinos(ninosParaSelect);
+        setFormData({
+          id_nino: asignacion.id_nino,
+          id_padrino: asignacion.id_padrino,
+          tipo_apadrinamiento: asignacion.tipo_apadrinamiento,
+          estado_apadrinamiento_registro: asignacion.estado_apadrinamiento_registro,
+        });
+      } else {
+        setNinos(ninosData.filter((n) => n.estado_apadrinamiento === "Disponible"));
+      }
+    } catch {
       toast.error("Error al cargar datos");
+      if (isEditing) navigate("/asignaciones");
     } finally {
       setLoading(false);
     }
@@ -78,26 +105,41 @@ export default function AsignacionNueva() {
 
     try {
       setSubmitting(true);
-      const nuevaAsignacion = await ApadrinamientosService.create({
-        id_nino: formData.id_nino,
-        id_padrino: formData.id_padrino,
-        fecha_inicio: new Date().toISOString().split("T")[0],
-        tipo_apadrinamiento: formData.tipo_apadrinamiento,
-        estado_apadrinamiento_registro: "Activo",
-        entregas_ids: [],
-      });
 
-      // Actualizar estado del niño
-      await NinosService.update(formData.id_nino, {
-        estado_apadrinamiento: "Apadrinado",
-        id_padrino_actual: formData.id_padrino,
-        fecha_apadrinamiento_actual: new Date().toISOString().split("T")[0],
-      });
+      if (isEditing && id) {
+        const asignacionActualizada = await ApadrinamientosService.update(id, {
+          tipo_apadrinamiento: formData.tipo_apadrinamiento,
+          estado_apadrinamiento_registro: formData.estado_apadrinamiento_registro,
+        });
 
-      toast.success("Asignación creada exitosamente");
-      navigate(`/asignaciones/${nuevaAsignacion.id_apadrinamiento}`);
+        toast.success("Asignación actualizada exitosamente");
+        navigate(`/asignaciones/${asignacionActualizada.id_apadrinamiento || id}`);
+      } else {
+        const nuevaAsignacion = await ApadrinamientosService.create({
+          id_nino: formData.id_nino,
+          id_padrino: formData.id_padrino,
+          fecha_inicio: new Date().toISOString().split("T")[0],
+          tipo_apadrinamiento: formData.tipo_apadrinamiento,
+          estado_apadrinamiento_registro: "Activo",
+          entregas_ids: [],
+        });
+
+        await NinosService.update(formData.id_nino, {
+          estado_apadrinamiento: "Apadrinado",
+          id_padrino_actual: formData.id_padrino,
+          fecha_apadrinamiento_actual: new Date().toISOString().split("T")[0],
+        });
+
+        toast.success("Asignación creada exitosamente");
+        navigate(`/asignaciones/${nuevaAsignacion.id_apadrinamiento}`);
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al crear asignación";
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : isEditing
+            ? "Error al actualizar asignación"
+            : "Error al crear asignación";
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
@@ -118,9 +160,13 @@ export default function AsignacionNueva() {
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Nueva Asignación</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Asignación" : "Nueva Asignación"}
+        </h1>
         <p className="text-muted-foreground">
-          Crea un nuevo apadrinamiento entre un niño y un padrino
+          {isEditing
+            ? "Modifica los datos del apadrinamiento y guarda los cambios"
+            : "Crea un nuevo apadrinamiento entre un niño y un padrino"}
         </p>
       </div>
 
@@ -134,7 +180,11 @@ export default function AsignacionNueva() {
               <Label htmlFor="id_nino">
                 Niño <span className="text-destructive">*</span>
               </Label>
-              <Select value={formData.id_nino} onValueChange={(value) => setFormData(prev => ({ ...prev, id_nino: value }))}>
+              <Select
+                value={formData.id_nino}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, id_nino: value }))}
+                disabled={isEditing}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona un niño" />
                 </SelectTrigger>
@@ -152,13 +202,22 @@ export default function AsignacionNueva() {
                   )}
                 </SelectContent>
               </Select>
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">
+                  El niño asignado no se puede cambiar en una asignación existente
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="id_padrino">
                 Padrino <span className="text-destructive">*</span>
               </Label>
-              <Select value={formData.id_padrino} onValueChange={(value) => setFormData(prev => ({ ...prev, id_padrino: value }))}>
+              <Select
+                value={formData.id_padrino}
+                onValueChange={(value) => setFormData((prev) => ({ ...prev, id_padrino: value }))}
+                disabled={isEditing}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona un padrino" />
                 </SelectTrigger>
@@ -170,13 +229,23 @@ export default function AsignacionNueva() {
                   ))}
                 </SelectContent>
               </Select>
+              {isEditing && (
+                <p className="text-xs text-muted-foreground">
+                  El padrino asignado no se puede cambiar en una asignación existente
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="tipo">
                 Tipo de Apadrinamiento <span className="text-destructive">*</span>
               </Label>
-              <Select value={formData.tipo_apadrinamiento} onValueChange={(value: "Aleatorio" | "Elección Padrino") => setFormData(prev => ({ ...prev, tipo_apadrinamiento: value }))}>
+              <Select
+                value={formData.tipo_apadrinamiento}
+                onValueChange={(value: "Aleatorio" | "Elección Padrino") =>
+                  setFormData((prev) => ({ ...prev, tipo_apadrinamiento: value }))
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona el tipo" />
                 </SelectTrigger>
@@ -186,6 +255,28 @@ export default function AsignacionNueva() {
                 </SelectContent>
               </Select>
             </div>
+
+            {isEditing && (
+              <div className="space-y-2">
+                <Label htmlFor="estado">
+                  Estado <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.estado_apadrinamiento_registro}
+                  onValueChange={(value: "Activo" | "Finalizado") =>
+                    setFormData((prev) => ({ ...prev, estado_apadrinamiento_registro: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona el estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Activo">Activo</SelectItem>
+                    <SelectItem value="Finalizado">Finalizado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="flex gap-4 justify-end">
               <Button
@@ -200,8 +291,10 @@ export default function AsignacionNueva() {
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
+                    {isEditing ? "Guardando..." : "Creando..."}
                   </>
+                ) : isEditing ? (
+                  "Guardar Cambios"
                 ) : (
                   "Crear Asignación"
                 )}

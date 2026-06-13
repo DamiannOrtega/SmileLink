@@ -41,6 +41,7 @@ export interface Apadrinamiento {
   id_apadrinamiento: string;
   id_padrino: string; // FK to Padrino
   id_nino: string; // FK to Nino
+  id_evento?: string; // FK to Evento (Nullable)
   fecha_inicio: string; // YYYY-MM-DD
   fecha_fin?: string; // Date (Nullable)
   tipo_apadrinamiento: "Aleatorio" | "Elección Padrino";
@@ -456,6 +457,7 @@ const normApadrinamiento = (a: any): Apadrinamiento => ({
   id_apadrinamiento: String(a.id),
   id_padrino: String(a.id_padrino),
   id_nino: String(a.id_nino),
+  id_evento: a.id_evento != null ? String(a.id_evento) : undefined,
   fecha_inicio: a.fecha_inicio,
   fecha_fin: a.fecha_fin ?? undefined,
   tipo_apadrinamiento: a.tipo_apadrinamiento,
@@ -686,10 +688,12 @@ export const ApadrinamientosService = {
       MOCK_APADRINAMIENTOS.push(newApadrinamiento);
       return newApadrinamiento;
     }
-    return fetchAPI<Apadrinamiento>("/apadrinamientos/", {
+    const raw = await fetchAPI<any>("/apadrinamientos/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    const created = await fetchAPI<any>(`/apadrinamientos/${raw.id}/`);
+    return normApadrinamiento(created);
   },
 
   async update(id: string, data: Partial<Apadrinamiento>): Promise<Apadrinamiento> {
@@ -700,10 +704,11 @@ export const ApadrinamientosService = {
       MOCK_APADRINAMIENTOS[index] = { ...MOCK_APADRINAMIENTOS[index], ...data };
       return MOCK_APADRINAMIENTOS[index];
     }
-    return fetchAPI<Apadrinamiento>(`/apadrinamientos/${id}/`, {
+    const raw = await fetchAPI<any>(`/apadrinamientos/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+    return normApadrinamiento(raw);
   },
 
   async delete(id: string): Promise<void> {
