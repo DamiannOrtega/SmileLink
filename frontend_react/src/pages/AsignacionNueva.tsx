@@ -12,8 +12,22 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   ApadrinamientosService,
   NinosService,
@@ -30,6 +44,8 @@ export default function AsignacionNueva() {
   const [loading, setLoading] = useState(true);
   const [ninos, setNinos] = useState<Nino[]>([]);
   const [padrinos, setPadrinos] = useState<Padrino[]>([]);
+  const [openNino, setOpenNino] = useState(false);
+  const [openPadrino, setOpenPadrino] = useState(false);
 
   const [formData, setFormData] = useState({
     id_nino: "",
@@ -176,61 +192,125 @@ export default function AsignacionNueva() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="id_nino">
+            <div className="space-y-2 flex flex-col">
+              <Label htmlFor="id_nino" className="mb-1">
                 Niño <span className="text-destructive">*</span>
               </Label>
-              <Select
-                value={formData.id_nino}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, id_nino: value }))}
-                disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un niño" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ninos.length === 0 ? (
-                    <div className="p-2 text-sm text-muted-foreground">
-                      No hay niños disponibles
-                    </div>
-                  ) : (
-                    ninos.map((nino) => (
-                      <SelectItem key={nino.id_nino} value={nino.id_nino}>
-                        {nino.nombre} ({nino.edad} años)
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              {isEditing ? (
+                <div className="p-2 border rounded-md bg-muted text-muted-foreground text-sm font-medium">
+                  {ninos.find((n) => n.id_nino === formData.id_nino)?.nombre || "Cargando..."}
+                </div>
+              ) : (
+                <Popover open={openNino} onOpenChange={setOpenNino}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openNino}
+                      className="w-full justify-between font-normal text-left"
+                      disabled={isEditing}
+                    >
+                      {formData.id_nino
+                        ? ninos.find((n) => n.id_nino === formData.id_nino)?.nombre +
+                          ` (${ninos.find((n) => n.id_nino === formData.id_nino)?.edad} años)`
+                        : "Selecciona un niño"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command className="w-full">
+                      <CommandInput placeholder="Buscar niño por nombre o edad..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No se encontraron niños.</CommandEmpty>
+                        <CommandGroup>
+                          {ninos.map((nino) => (
+                            <CommandItem
+                              key={nino.id_nino}
+                              value={`${nino.nombre} ${nino.edad} años ${nino.id_nino}`.toLowerCase()}
+                              onSelect={() => {
+                                setFormData((prev) => ({ ...prev, id_nino: nino.id_nino }));
+                                setOpenNino(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  formData.id_nino === nino.id_nino ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {nino.nombre} ({nino.edad} años)
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
               {isEditing && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mt-1">
                   El niño asignado no se puede cambiar en una asignación existente
                 </p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="id_padrino">
+            <div className="space-y-2 flex flex-col">
+              <Label htmlFor="id_padrino" className="mb-1">
                 Padrino <span className="text-destructive">*</span>
               </Label>
-              <Select
-                value={formData.id_padrino}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, id_padrino: value }))}
-                disabled={isEditing}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un padrino" />
-                </SelectTrigger>
-                <SelectContent>
-                  {padrinos.map((padrino) => (
-                    <SelectItem key={padrino.id_padrino} value={padrino.id_padrino}>
-                      {padrino.nombre} ({padrino.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isEditing ? (
+                <div className="p-2 border rounded-md bg-muted text-muted-foreground text-sm font-medium">
+                  {padrinos.find((p) => p.id_padrino === formData.id_padrino)?.nombre || "Cargando..."}
+                </div>
+              ) : (
+                <Popover open={openPadrino} onOpenChange={setOpenPadrino}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openPadrino}
+                      className="w-full justify-between font-normal text-left"
+                      disabled={isEditing}
+                    >
+                      {formData.id_padrino
+                        ? padrinos.find((p) => p.id_padrino === formData.id_padrino)?.nombre +
+                          ` (${padrinos.find((p) => p.id_padrino === formData.id_padrino)?.email})`
+                        : "Selecciona un padrino"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command className="w-full">
+                      <CommandInput placeholder="Buscar padrino por nombre o correo..." className="h-9" />
+                      <CommandList>
+                        <CommandEmpty>No se encontraron padrinos.</CommandEmpty>
+                        <CommandGroup>
+                          {padrinos.map((padrino) => (
+                            <CommandItem
+                              key={padrino.id_padrino}
+                              value={`${padrino.nombre} ${padrino.email} ${padrino.id_padrino}`.toLowerCase()}
+                              onSelect={() => {
+                                setFormData((prev) => ({ ...prev, id_padrino: padrino.id_padrino }));
+                                setOpenPadrino(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  formData.id_padrino === padrino.id_padrino ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {padrino.nombre} ({padrino.email})
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              )}
               {isEditing && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground mt-1">
                   El padrino asignado no se puede cambiar en una asignación existente
                 </p>
               )}
