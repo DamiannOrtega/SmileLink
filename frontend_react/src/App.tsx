@@ -19,6 +19,7 @@ import Cartas from "./pages/Cartas";
 import CartaNueva from "./pages/CartaNueva";
 import CartaDetalle from "./pages/CartaDetalle";
 import EntregaDetalle from "./pages/EntregaDetalle";
+import EntregaNueva from "./pages/EntregaNueva";
 import Entregas from "./pages/Entregas";
 import Ubicaciones from "./pages/Ubicaciones";
 import UbicacionNueva from "./pages/UbicacionNueva";
@@ -59,6 +60,7 @@ const App = () => (
           <Route path="/cartas/:id" element={<AdminLayout><CartaDetalle /></AdminLayout>} />
           <Route path="/cartas/:id/editar" element={<AdminLayout><CartaNueva /></AdminLayout>} />
           <Route path="/entregas" element={<AdminLayout><Entregas /></AdminLayout>} />
+          <Route path="/entregas/nueva" element={<AdminLayout><EntregaNueva /></AdminLayout>} />
           <Route path="/entregas/:id" element={<AdminLayout><EntregaDetalle /></AdminLayout>} />
           <Route path="/ubicaciones" element={<AdminLayout><Ubicaciones /></AdminLayout>} />
           <Route path="/ubicaciones/nueva" element={<AdminLayout><UbicacionNueva /></AdminLayout>} />

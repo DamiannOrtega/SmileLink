@@ -608,6 +608,8 @@ class SolicitudesViewSet(viewsets.ViewSet):
         except Solicitud.DoesNotExist:
             return Response({'error': 'Solicitud no encontrada'}, status=status.HTTP_404_NOT_FOUND)
         data = request.data
+        if 'descripcion_solicitud' in data:
+            sol.descripcion_solicitud = data['descripcion_solicitud']
         if 'estado_solicitud' in data:
             sol.estado_solicitud = data['estado_solicitud']
         if 'fecha_cierre' in data:
