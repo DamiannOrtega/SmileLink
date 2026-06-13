@@ -40,6 +40,9 @@ export default function NinosRefactored() {
     const [searchTerm, setSearchTerm] = useState("");
     const [estadoFilter, setEstadoFilter] = useState<string>("todos");
     const [generoFilter, setGeneroFilter] = useState<string>("todos");
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
+    const [sortBy, setSortBy] = useState("name_asc");
 
     // Estados para diálogo de eliminación
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -67,12 +70,35 @@ export default function NinosRefactored() {
     };
 
     // Filtrado de niños
-    const filteredNinos = ninos.filter((nino) => {
-        const matchesSearch = nino.nombre.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesEstado = estadoFilter === "todos" || nino.estado_apadrinamiento === estadoFilter;
-        const matchesGenero = generoFilter === "todos" || nino.genero === generoFilter;
-        return matchesSearch && matchesEstado && matchesGenero;
-    });
+    const filteredNinos = ninos
+        .filter((nino) => {
+            const matchesSearch = nino.nombre.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesEstado = estadoFilter === "todos" || nino.estado_apadrinamiento === estadoFilter;
+            const matchesGenero = generoFilter === "todos" || nino.genero === generoFilter;
+            
+            const apadrinamientoDate = nino.fecha_apadrinamiento_actual ? new Date(nino.fecha_apadrinamiento_actual) : null;
+            const matchesStart = !startDate || (apadrinamientoDate && apadrinamientoDate >= new Date(startDate));
+            const matchesEnd = !endDate || (apadrinamientoDate && apadrinamientoDate <= new Date(endDate));
+            
+            return matchesSearch && matchesEstado && matchesGenero && matchesStart && matchesEnd;
+        })
+        .sort((a, b) => {
+            if (sortBy === "name_asc") return a.nombre.localeCompare(b.nombre);
+            if (sortBy === "name_desc") return b.nombre.localeCompare(a.nombre);
+            if (sortBy === "age_asc") return a.edad - b.edad;
+            if (sortBy === "age_desc") return b.edad - a.edad;
+            if (sortBy === "date_desc") {
+                const dateA = a.fecha_apadrinamiento_actual ? new Date(a.fecha_apadrinamiento_actual).getTime() : 0;
+                const dateB = b.fecha_apadrinamiento_actual ? new Date(b.fecha_apadrinamiento_actual).getTime() : 0;
+                return dateB - dateA;
+            }
+            if (sortBy === "date_asc") {
+                const dateA = a.fecha_apadrinamiento_actual ? new Date(a.fecha_apadrinamiento_actual).getTime() : 0;
+                const dateB = b.fecha_apadrinamiento_actual ? new Date(b.fecha_apadrinamiento_actual).getTime() : 0;
+                return dateA - dateB;
+            }
+            return 0;
+        });
 
     const getEstadoBadge = (estado: Nino["estado_apadrinamiento"]) => {
         const variants: Record<Nino["estado_apadrinamiento"], "default" | "destructive"> = {
@@ -110,6 +136,9 @@ export default function NinosRefactored() {
         setSearchTerm("");
         setEstadoFilter("todos");
         setGeneroFilter("todos");
+        setStartDate("");
+        setEndDate("");
+        setSortBy("name_asc");
     };
 
     // ✅ SKELETON LOADING STATE
@@ -188,44 +217,96 @@ export default function NinosRefactored() {
                 </Button>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Filtros</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid gap-4 md:grid-cols-4">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                placeholder="Buscar por nombre..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Estado" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="todos">Todos los estados</SelectItem>
-                                <SelectItem value="Disponible">Disponible</SelectItem>
-                                <SelectItem value="Apadrinado">Apadrinado</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Select value={generoFilter} onValueChange={setGeneroFilter}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Género" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="todos">Todos</SelectItem>
-                                <SelectItem value="Masculino">Masculino</SelectItem>
-                                <SelectItem value="Femenino">Femenino</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <Button variant="outline" onClick={handleClearFilters}>
+            <Card className="border-border/40 bg-card/60 backdrop-blur-sm shadow-md">
+                <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-lg font-semibold">Filtros y Búsqueda</CardTitle>
+                    {(searchTerm || estadoFilter !== "todos" || generoFilter !== "todos" || sortBy !== "name_asc" || startDate || endDate) && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleClearFilters}
+                            className="text-xs h-8 text-muted-foreground hover:text-foreground"
+                        >
                             Limpiar filtros
                         </Button>
+                    )}
+                </CardHeader>
+                <CardContent>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12">
+                        <div className="space-y-1.5 sm:col-span-2 md:col-span-3 lg:col-span-3">
+                            <label className="text-xs font-medium text-muted-foreground">Búsqueda</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    placeholder="Buscar por nombre..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-10 h-10 bg-background/50 border-input/60 focus:border-primary transition-colors"
+                                />
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-1.5 sm:col-span-1 lg:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Estado</label>
+                            <select
+                                value={estadoFilter}
+                                onChange={(e) => setEstadoFilter(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input/60 bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+                            >
+                                <option value="todos">Todos los estados</option>
+                                <option value="Disponible">Disponible</option>
+                                <option value="Apadrinado">Apadrinado</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-1 lg:col-span-1">
+                            <label className="text-xs font-medium text-muted-foreground">Género</label>
+                            <select
+                                value={generoFilter}
+                                onChange={(e) => setGeneroFilter(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input/60 bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+                            >
+                                <option value="todos">Todos</option>
+                                <option value="Masculino">Masculino</option>
+                                <option value="Femenino">Femenino</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-1 lg:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Ordenar por</label>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="flex h-10 w-full rounded-md border border-input/60 bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
+                            >
+                                <option value="name_asc">Nombre (A-Z)</option>
+                                <option value="name_desc">Nombre (Z-A)</option>
+                                <option value="age_asc">Edad (Menor a Mayor)</option>
+                                <option value="age_desc">Edad (Mayor a Menor)</option>
+                                <option value="date_desc">Apadrinado (Reciente)</option>
+                                <option value="date_asc">Apadrinado (Antiguo)</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-1 lg:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Apadrinado Desde</label>
+                            <Input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                className="h-10 bg-background/50 border-input/60 focus:border-primary transition-colors text-xs"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5 sm:col-span-1 lg:col-span-2">
+                            <label className="text-xs font-medium text-muted-foreground">Apadrinado Hasta</label>
+                            <Input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                className="h-10 bg-background/50 border-input/60 focus:border-primary transition-colors text-xs"
+                            />
+                        </div>
                     </div>
                 </CardContent>
             </Card>

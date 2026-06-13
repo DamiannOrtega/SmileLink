@@ -259,55 +259,83 @@ private fun DeliveryStatusItem(
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
+        Column(
             modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(20.dp)
-            )
-            
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = entrega.descripcionRegalo,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(20.dp)
                 )
                 
-                Text(
-                    text = "$statusText • ${entrega.fechaProgramada}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
-            if (entrega.mongoEvidenciaId.isNullOrBlank()) {
-                Button(
-                    onClick = { onUploadEvidence(entrega) },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text("Anexar", style = MaterialTheme.typography.labelMedium)
-                }
-            } else {
-                Surface(
-                    color = SuccessGreen.copy(alpha = 0.2f),
-                    shape = MaterialTheme.shapes.extraSmall
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
                     Text(
-                        text = "Evidencia ✓",
-                        color = SuccessGreen,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        text = entrega.descripcionRegalo,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    
+                    Text(
+                        text = "$statusText • ${entrega.fechaProgramada}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                
+                if (entrega.mongoEvidenciaId.isNullOrBlank()) {
+                    Button(
+                        onClick = { onUploadEvidence(entrega) },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text("Anexar", style = MaterialTheme.typography.labelMedium)
+                    }
+                } else {
+                    Surface(
+                        color = SuccessGreen.copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text(
+                            text = "Evidencia ✓",
+                            color = SuccessGreen,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+            
+            // Photo preview if available in NoSQL metadata
+            val photoUrl = remember(entrega.evidenciasNosql) {
+                val firstPhoto = entrega.evidenciasNosql?.firstOrNull { it.tipo == "foto" }
+                if (firstPhoto != null) {
+                    val apiBase = com.example.smilelinkapp.config.AppConfig.BASE_URL
+                    val serverBase = if (apiBase.endsWith("/api/")) apiBase.substringBefore("/api/") else "http://10.66.207.165:8000"
+                    "${serverBase}/${firstPhoto.urlArchivo}"
+                } else {
+                    null
+                }
+            }
+            
+            if (photoUrl != null) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = "Evidencia de entrega",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(MaterialTheme.shapes.small),
+                    contentScale = ContentScale.Crop
+                )
             }
         }
     }

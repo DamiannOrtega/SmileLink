@@ -229,8 +229,14 @@ class EntregaSerializer(serializers.ModelSerializer):
         return descifrar_campo(obj.observaciones_cifradas)
 
     def get_evidencias_nosql(self, obj):
-        # Solo se incluye en el detalle (inyectado desde la view)
-        return getattr(obj, '_evidencias_nosql', [])
+        val = getattr(obj, '_evidencias_nosql', None)
+        if val is not None:
+            return val
+        from api.mongo_client import obtener_evidencias
+        try:
+            return obtener_evidencias(obj.pk)
+        except Exception:
+            return []
 
 
 # ──────────────────────────────────────────────────────────────────────────────

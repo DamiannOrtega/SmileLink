@@ -492,6 +492,7 @@ const normEntrega = (e: any): Entrega => ({
   observaciones: e.observaciones || '',
   id_punto_entrega: String(e.id_punto_entrega),
   evidencia_foto_path: undefined,
+  mongo_evidencia_id: e.mongo_evidencia_id,
   evidencias_nosql: Array.isArray(e.evidencias_nosql) ? e.evidencias_nosql : [],
 });
 

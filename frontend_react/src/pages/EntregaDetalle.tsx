@@ -20,7 +20,10 @@ import {
   Padrino,
 } from "@/services/api";
 
-const BACKEND_URL = import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:8000";
+const VITE_API_URL = import.meta.env.VITE_API_URL;
+const BACKEND_URL = VITE_API_URL && VITE_API_URL !== "/api"
+  ? VITE_API_URL.replace("/api", "")
+  : "http://10.66.207.165:8000";
 
 export default function EntregaDetalle() {
   const { id } = useParams();

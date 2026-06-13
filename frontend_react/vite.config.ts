@@ -13,6 +13,10 @@ export default defineConfig(({ mode }) => ({
         target: "http://10.66.207.165:8000",
         changeOrigin: true,
       },
+      "/media": {
+        target: "http://10.66.207.165:8000",
+        changeOrigin: true,
+      },
     },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),

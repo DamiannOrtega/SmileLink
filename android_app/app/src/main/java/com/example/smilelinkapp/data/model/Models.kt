@@ -99,6 +99,26 @@ data class Apadrinamiento(
 )
 
 /**
+ * Data model for NoSQL Evidence (Evidencia) in MongoDB
+ */
+data class EvidenciaNoSql(
+    @SerializedName("_id")
+    val id: String = "",
+    
+    @SerializedName("tipo")
+    val tipo: String = "",
+    
+    @SerializedName("url_archivo")
+    val urlArchivo: String = "",
+    
+    @SerializedName("timestamp")
+    val timestamp: String = "",
+    
+    @SerializedName("subido_por")
+    val subidoPor: String = ""
+)
+
+/**
  * Data model for Delivery (Entrega)
  */
 data class Entrega(
@@ -130,7 +150,10 @@ data class Entrega(
     val evidenciaFotoPath: String? = null,
     
     @SerializedName("mongo_evidencia_id")
-    val mongoEvidenciaId: String? = null
+    val mongoEvidenciaId: String? = null,
+    
+    @SerializedName("evidencias_nosql")
+    val evidenciasNosql: List<EvidenciaNoSql>? = null
 )
 
 /**

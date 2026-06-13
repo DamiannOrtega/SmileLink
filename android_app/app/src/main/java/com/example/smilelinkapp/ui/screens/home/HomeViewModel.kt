@@ -30,6 +30,12 @@ class HomeViewModel : ViewModel() {
     
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _genderFilter = MutableStateFlow("Todos")
+    val genderFilter: StateFlow<String> = _genderFilter.asStateFlow()
+
+    private val _sortBy = MutableStateFlow("Nombre")
+    val sortBy: StateFlow<String> = _sortBy.asStateFlow()
     
     init {
         loadAvailableChildren()
@@ -54,15 +60,41 @@ class HomeViewModel : ViewModel() {
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }
+
+    fun updateGenderFilter(gender: String) {
+        _genderFilter.value = gender
+    }
+
+    fun updateSortBy(sort: String) {
+        _sortBy.value = sort
+    }
     
     fun getFilteredChildren(ninos: List<Nino>): List<Nino> {
-        val query = _searchQuery.value
-        if (query.isBlank()) return ninos
+        var result = ninos
         
-        return ninos.filter { nino ->
-            nino.nombre.contains(query, ignoreCase = true) ||
-            (nino.descripcion?.contains(query, ignoreCase = true) ?: false) ||
-            (nino.necesidades?.any { it.contains(query, ignoreCase = true) } ?: false)
+        val query = _searchQuery.value
+        if (query.isNotBlank()) {
+            result = result.filter { nino ->
+                nino.nombre.contains(query, ignoreCase = true) ||
+                (nino.descripcion?.contains(query, ignoreCase = true) ?: false) ||
+                (nino.necesidades?.any { it.contains(query, ignoreCase = true) } ?: false)
+            }
         }
+
+        val gender = _genderFilter.value
+        if (gender != "Todos") {
+            result = result.filter { nino ->
+                nino.genero.equals(gender, ignoreCase = true)
+            }
+        }
+
+        result = when (_sortBy.value) {
+            "Edad (Menor)" -> result.sortedBy { it.edad }
+            "Edad (Mayor)" -> result.sortedByDescending { it.edad }
+            "Nombre (Z-A)" -> result.sortedByDescending { it.nombre }
+            else -> result.sortedBy { it.nombre }
+        }
+        
+        return result
     }
 }
