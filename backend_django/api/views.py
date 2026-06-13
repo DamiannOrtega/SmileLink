@@ -23,9 +23,11 @@ from .serializers import (
     SolicitudSerializer, DashboardKPIsSerializer,
 )
 from utils.encryption import cifrar_campo, descifrar_campo
+from utils.avatars import generar_url_avatar
 from .mongo_client import (
     guardar_evidencia, obtener_evidencias,
     registrar_bitacora, guardar_carta, registrar_notificacion,
+    guardar_foto_nino,
 )
 
 import logging
@@ -67,7 +69,7 @@ class NinosViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
     def create(self, request):
-        """POST /api/ninos/ — crear niño cifrando el nombre."""
+        """POST /api/ninos/ — crear niño cifrando el nombre y guardando foto en MongoDB."""
         data = request.data
         nombre = data.get('nombre', '').strip()
         if not nombre:
@@ -87,6 +89,15 @@ class NinosViewSet(viewsets.ViewSet):
             logger.error(f"Error al crear niño: {e}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Generar y guardar foto/avatar en MongoDB
+        foto_url = data.get('foto', '').strip()
+        if not foto_url:
+            foto_url = generar_url_avatar(nombre)
+        try:
+            guardar_foto_nino(nino.pk, foto_url)
+        except Exception as e:
+            logger.warning(f"No se pudo guardar la foto del niño en MongoDB: {e}")
+
         registrar_bitacora(None, 'api_nino', 'CREATE', {'nino_id': nino.pk, 'genero': nino.genero})
         return Response({'id': nino.pk, 'mensaje': 'Niño registrado correctamente'},
                         status=status.HTTP_201_CREATED)
@@ -99,6 +110,9 @@ class NinosViewSet(viewsets.ViewSet):
             return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
         data = request.data
+        nombre_original = descifrar_campo(nino.nombre_cifrado)
+        nombre_nuevo = data.get('nombre', '').strip()
+
         if 'nombre' in data:
             nino.nombre_cifrado = cifrar_campo(data['nombre'])
         if 'edad' in data:
@@ -115,6 +129,23 @@ class NinosViewSet(viewsets.ViewSet):
             nino.activo = data['activo']
 
         nino.save()
+
+        # Actualizar foto/avatar en MongoDB si se proporciona o si cambió el nombre y no tiene foto personalizada
+        if 'foto' in data:
+            try:
+                guardar_foto_nino(nino.pk, data['foto'].strip())
+            except Exception as e:
+                logger.warning(f"No se pudo guardar la foto del niño en MongoDB: {e}")
+        elif 'nombre' in data and nombre_nuevo != nombre_original:
+            try:
+                from .mongo_client import obtener_foto_nino
+                foto_actual = obtener_foto_nino(nino.pk)
+                # Si la foto actual es un avatar de DiceBear con el nombre viejo, la actualizamos
+                if not foto_actual or "api.dicebear.com" in foto_actual:
+                    guardar_foto_nino(nino.pk, generar_url_avatar(nombre_nuevo))
+            except Exception as e:
+                logger.warning(f"No se pudo actualizar la foto por cambio de nombre: {e}")
+
         registrar_bitacora(None, 'api_nino', 'UPDATE', {'nino_id': nino.pk})
         return Response(NinoSerializer(nino).data)
 
@@ -842,4 +873,86 @@ class DashboardViewSet(viewsets.ViewSet):
         except Exception as e:
             logger.error(f"Error al obtener métricas NoSQL: {e}")
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def diagnostics_check(request):
+    """
+    Realiza diagnósticos en tiempo real de los componentes del sistema:
+    - MySQL (Relacional)
+    - MongoDB (NoSQL Documental)
+    - Cifrado/Descifrado (Fernet)
+    """
+    import time
+    from django.conf import settings
+    
+    # 1. Verificar MySQL
+    mysql_status = "Error"
+    mysql_details = ""
+    mysql_latency = 0
+    start = time.time()
+    try:
+        from .models import Nino
+        # Ejecutar una consulta básica
+        Nino.objects.exists()
+        mysql_status = "Operational"
+        mysql_details = "Conexión activa a base de datos MySQL."
+        mysql_latency = round((time.time() - start) * 1000, 2)
+    except Exception as e:
+        mysql_details = str(e)
+        
+    # 2. Verificar MongoDB
+    mongo_status = "Error"
+    mongo_details = ""
+    mongo_latency = 0
+    start = time.time()
+    try:
+        from .mongo_client import get_mongo_db
+        db = get_mongo_db()
+        # Ping a MongoDB
+        db.command("ping")
+        mongo_status = "Operational"
+        mongo_details = f"Conexión activa a MongoDB en host {settings.MONGODB_HOST}."
+        mongo_latency = round((time.time() - start) * 1000, 2)
+    except Exception as e:
+        mongo_details = str(e)
+
+    # 3. Verificar Cifrado (Fernet)
+    encryption_status = "Error"
+    encryption_details = ""
+    try:
+        from utils.encryption import cifrar_campo, descifrar_campo
+        test_str = "SmileLink_Fernet_Test_2026"
+        encrypted = cifrar_campo(test_str)
+        decrypted = descifrar_campo(encrypted)
+        if decrypted == test_str:
+            encryption_status = "Operational"
+            encryption_details = "Algoritmo Fernet funcionando correctamente."
+        else:
+            encryption_details = "La cadena descifrada no coincide con la original."
+    except Exception as e:
+        encryption_details = str(e)
+
+    return Response({
+        'status': 'success',
+        'mysql': {
+            'status': mysql_status,
+            'details': mysql_details,
+            'latency_ms': mysql_latency
+        },
+        'mongodb': {
+            'status': mongo_status,
+            'details': mongo_details,
+            'latency_ms': mongo_latency
+        },
+        'encryption': {
+            'status': encryption_status,
+            'details': encryption_details
+        }
+    })
+
 

@@ -115,8 +115,12 @@ export default function NinoDetalle() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="aspect-square relative overflow-hidden rounded-lg bg-muted flex items-center justify-center mb-4">
-              <User className="h-20 w-20 text-muted-foreground" />
+            <div className="aspect-square relative overflow-hidden rounded-lg bg-muted flex items-center justify-center mb-4 border border-border">
+              {nino.foto ? (
+                <img src={nino.foto} alt={nino.nombre} className="h-full w-full object-cover bg-background" />
+              ) : (
+                <User className="h-20 w-20 text-muted-foreground" />
+              )}
             </div>
             <div className="space-y-3">
               <div>

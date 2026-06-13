@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Search, Eye, Pencil, Trash2, Loader2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -256,7 +256,22 @@ export default function NinosRefactored() {
                                 {filteredNinos.map((nino) => (
                                     <TableRow key={nino.id_nino}>
                                         <TableCell className="font-mono text-xs">{nino.id_nino}</TableCell>
-                                        <TableCell className="font-medium">{nino.nombre}</TableCell>
+                                        <TableCell className="font-medium">
+                                            <div className="flex items-center gap-3">
+                                                {nino.foto ? (
+                                                    <img
+                                                        src={nino.foto}
+                                                        alt={nino.nombre}
+                                                        className="h-8 w-8 rounded-full object-cover border border-border bg-background"
+                                                    />
+                                                ) : (
+                                                    <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center border border-border">
+                                                        <User className="h-4 w-4 text-muted-foreground" />
+                                                    </div>
+                                                )}
+                                                <span>{nino.nombre}</span>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>{nino.edad} años</TableCell>
                                         <TableCell>{nino.genero}</TableCell>
                                         <TableCell className="max-w-xs truncate">{nino.descripcion}</TableCell>

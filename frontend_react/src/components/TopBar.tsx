@@ -1,4 +1,5 @@
-import { Bell, ChevronDown, LogOut } from "lucide-react";
+import { useState } from "react";
+import { Bell, ChevronDown, LogOut, Activity } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -12,9 +13,11 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { DiagnosticsModal } from "./DiagnosticsModal";
 
 export function TopBar() {
   const navigate = useNavigate();
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   
   const handleLogout = () => {
     navigate("/login");
@@ -28,6 +31,17 @@ export function TopBar() {
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Botón de Diagnósticos de Base de Datos y Rutas */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setDiagnosticsOpen(true)}
+            title="Diagnóstico del Sistema"
+            className="text-muted-foreground hover:text-primary transition-colors"
+          >
+            <Activity className="h-5 w-5" />
+          </Button>
+
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
             <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
@@ -70,6 +84,9 @@ export function TopBar() {
           </DropdownMenu>
         </div>
       </div>
+      
+      {/* Diálogo de Diagnósticos de Base de Datos y Rutas */}
+      <DiagnosticsModal open={diagnosticsOpen} onOpenChange={setDiagnosticsOpen} />
     </header>
   );
 }

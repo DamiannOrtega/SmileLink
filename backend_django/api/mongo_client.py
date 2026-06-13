@@ -180,3 +180,35 @@ def registrar_notificacion(padrino_id: int, tipo: str, mensaje: str, enviado: bo
         'timestamp':  datetime.now(timezone.utc),
     })
     return str(result.inserted_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# FOTOS DE NIÑOS
+# ──────────────────────────────────────────────────────────────────────────────
+
+def guardar_foto_nino(nino_id: int, foto_url: str) -> str:
+    """
+    Guarda o actualiza la foto (URL o avatar) de un niño en MongoDB.
+
+    Returns:
+        str: ID de MongoDB
+    """
+    db = get_mongo_db()
+    result = db.ninos_fotos.update_one(
+        {'nino_id': nino_id},
+        {'$set': {'foto_url': foto_url}},
+        upsert=True
+    )
+    return str(result.upserted_id or '')
+
+
+def obtener_foto_nino(nino_id: int) -> str:
+    """
+    Obtiene la URL de la foto de un niño desde MongoDB.
+    """
+    db = get_mongo_db()
+    doc = db.ninos_fotos.find_one({'nino_id': nino_id})
+    if doc:
+        return doc.get('foto_url', '')
+    return ''
+

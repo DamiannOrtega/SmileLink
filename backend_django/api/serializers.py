@@ -90,11 +90,12 @@ class NinoSerializer(serializers.ModelSerializer):
     """
     nombre        = serializers.SerializerMethodField()
     nombre_input  = serializers.CharField(write_only=True, required=False)
+    foto          = serializers.SerializerMethodField()
 
     class Meta:
         model  = Nino
         fields = [
-            'id', 'nombre', 'nombre_input',
+            'id', 'nombre', 'nombre_input', 'foto',
             'edad', 'genero', 'descripcion', 'necesidades',
             'estado_apadrinamiento',
             'id_padrino_actual', 'fecha_apadrinamiento_actual',
@@ -105,17 +106,42 @@ class NinoSerializer(serializers.ModelSerializer):
     def get_nombre(self, obj):
         return descifrar_campo(obj.nombre_cifrado)
 
+    def get_foto(self, obj):
+        from .mongo_client import obtener_foto_nino
+        from utils.avatars import generar_url_avatar
+        try:
+            foto = obtener_foto_nino(obj.pk)
+            if not foto:
+                nombre = descifrar_campo(obj.nombre_cifrado)
+                foto = generar_url_avatar(nombre)
+            return foto
+        except Exception:
+            return ''
+
 
 class NinoListSerializer(serializers.ModelSerializer):
     """Versión liviana para listados."""
     nombre = serializers.SerializerMethodField()
+    foto   = serializers.SerializerMethodField()
 
     class Meta:
         model  = Nino
-        fields = ['id', 'nombre', 'edad', 'genero', 'estado_apadrinamiento', 'activo']
+        fields = ['id', 'nombre', 'foto', 'edad', 'genero', 'estado_apadrinamiento', 'activo']
 
     def get_nombre(self, obj):
         return descifrar_campo(obj.nombre_cifrado)
+
+    def get_foto(self, obj):
+        from .mongo_client import obtener_foto_nino
+        from utils.avatars import generar_url_avatar
+        try:
+            foto = obtener_foto_nino(obj.pk)
+            if not foto:
+                nombre = descifrar_campo(obj.nombre_cifrado)
+                foto = generar_url_avatar(nombre)
+            return foto
+        except Exception:
+            return ''
 
 
 # ──────────────────────────────────────────────────────────────────────────────

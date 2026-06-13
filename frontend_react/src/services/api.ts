@@ -34,6 +34,7 @@ export interface Nino {
   id_padrino_actual?: string; // FK to Padrino (Nullable)
   estado_apadrinamiento: "Disponible" | "Apadrinado";
   fecha_apadrinamiento_actual?: string; // Date (Nullable)
+  foto?: string; // URL de la foto/avatar almacenada en MongoDB
 }
 
 export interface Apadrinamiento {
@@ -155,6 +156,7 @@ const MOCK_NINOS: Nino[] = [
     id_padrino_actual: "P001",
     estado_apadrinamiento: "Apadrinado",
     fecha_apadrinamiento_actual: "2025-11-01",
+    foto: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Sof%C3%ADa%20Mart%C3%ADnez&size=128",
   },
   {
     id_nino: "N002",
@@ -166,6 +168,7 @@ const MOCK_NINOS: Nino[] = [
     id_padrino_actual: "P002",
     estado_apadrinamiento: "Apadrinado",
     fecha_apadrinamiento_actual: "2025-10-15",
+    foto: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Carlos%20Ram%C3%ADrez&size=128",
   },
   {
     id_nino: "N003",
@@ -175,6 +178,7 @@ const MOCK_NINOS: Nino[] = [
     descripcion: "Le encanta bailar y la música.",
     necesidades: ["Zapatos de ballet", "Vestido"],
     estado_apadrinamiento: "Disponible",
+    foto: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Ana%20Patricia%20L%C3%B3pez&size=128",
   },
   {
     id_nino: "N004",
@@ -186,6 +190,7 @@ const MOCK_NINOS: Nino[] = [
     id_padrino_actual: "P003",
     estado_apadrinamiento: "Apadrinado",
     fecha_apadrinamiento_actual: "2025-11-10",
+    foto: "https://api.dicebear.com/7.x/fun-emoji/svg?seed=Miguel%20%C3%81ngel%20Torres&size=128",
   },
 ];
 
@@ -433,6 +438,7 @@ const normNino = (n: any): Nino => ({
   id_padrino_actual: n.id_padrino_actual != null ? String(n.id_padrino_actual) : undefined,
   estado_apadrinamiento: n.estado_apadrinamiento,
   fecha_apadrinamiento_actual: n.fecha_apadrinamiento_actual ?? undefined,
+  foto: n.foto || undefined,
 });
 
 const normPadrino = (p: any): Padrino => ({
@@ -1158,5 +1164,48 @@ export const DashboardService = {
     return fetchAPI<NoSQLStats>("/dashboard/nosql-stats/");
   }
 };
+
+export interface DiagnosticResult {
+  mysql: {
+    status: "Operational" | "Error";
+    details: string;
+    latency_ms: number;
+  };
+  mongodb: {
+    status: "Operational" | "Error";
+    details: string;
+    latency_ms: number;
+  };
+  encryption: {
+    status: "Operational" | "Error";
+    details: string;
+  };
+}
+
+export const DiagnosticsService = {
+  async check(): Promise<DiagnosticResult> {
+    if (USE_MOCK) {
+      await delay(800);
+      return {
+        mysql: {
+          status: "Operational",
+          details: "Simulado: Conexión activa a base de datos MySQL.",
+          latency_ms: 15.5
+        },
+        mongodb: {
+          status: "Operational",
+          details: "Simulado: Conexión activa a MongoDB en local.",
+          latency_ms: 8.2
+        },
+        encryption: {
+          status: "Operational",
+          details: "Simulado: Cifrado Fernet operando correctamente."
+        }
+      };
+    }
+    return fetchAPI<DiagnosticResult>("/diagnostics/check/");
+  }
+};
+
 
 

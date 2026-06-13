@@ -6,7 +6,8 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     NinosViewSet, PadrinosViewSet, ApadrinamientosViewSet,
     EntregasViewSet, SolicitudesViewSet, PuntosEntregaViewSet,
-    EventosViewSet, AdministradoresViewSet, DashboardViewSet
+    EventosViewSet, AdministradoresViewSet, DashboardViewSet,
+    diagnostics_check
 )
 from .auth_views import register, login, logout, get_current_user, google_login
 
@@ -23,6 +24,9 @@ router.register(r'dashboard',       DashboardViewSet,       basename='dashboard'
 
 urlpatterns = [
     path('', include(router.urls)),
+
+    # ── Diagnósticos
+    path('diagnostics/check/', diagnostics_check, name='diagnostics-check'),
 
     # ── Autenticación
     path('auth/register/', register,         name='auth-register'),
