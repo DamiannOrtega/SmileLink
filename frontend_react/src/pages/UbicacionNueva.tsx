@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,13 +13,20 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import LocationMapPicker from "@/components/LocationMapPicker";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { PuntosEntregaService } from "@/services/api";
+import { rememberInactivePunto } from "@/utils/puntosEntregaCache";
+
+const formatCoord = (value: number) => value.toFixed(6);
 
 export default function UbicacionNueva() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(isEditing);
 
   const [formData, setFormData] = useState({
     nombre_punto: "",
@@ -31,11 +38,61 @@ export default function UbicacionNueva() {
     estado_punto: "Activo" as "Activo" | "Inactivo",
   });
 
+  useEffect(() => {
+    if (!isEditing || !id) return;
+
+    const loadUbicacion = async () => {
+      try {
+        setLoading(true);
+        const ubicacion = await PuntosEntregaService.getById(id);
+        if (!ubicacion) {
+          toast.error("Ubicación no encontrada");
+          navigate("/ubicaciones");
+          return;
+        }
+
+        setFormData({
+          nombre_punto: ubicacion.nombre_punto,
+          direccion_fisica: ubicacion.direccion_fisica,
+          latitud: formatCoord(ubicacion.latitud),
+          longitud: formatCoord(ubicacion.longitud),
+          horario_atencion: ubicacion.horario_atencion || "",
+          contacto_referencia: ubicacion.contacto_referencia || "",
+          estado_punto: ubicacion.estado_punto,
+        });
+      } catch {
+        toast.error("Error al cargar la ubicación");
+        navigate("/ubicaciones");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUbicacion();
+  }, [id, isEditing, navigate]);
+
+  const mapCoords = useMemo(() => {
+    const lat = parseFloat(formData.latitud);
+    const lng = parseFloat(formData.longitud);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return { lat: null, lng: null };
+    }
+    return { lat, lng };
+  }, [formData.latitud, formData.longitud]);
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleMapLocationChange = (lat: number, lng: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitud: formatCoord(lat),
+      longitud: formatCoord(lng),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,41 +111,80 @@ export default function UbicacionNueva() {
     const lat = parseFloat(formData.latitud);
     const lng = parseFloat(formData.longitud);
 
-    if (isNaN(lat) || isNaN(lng)) {
-      toast.error("Las coordenadas deben ser números válidos");
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      toast.error("Selecciona un punto en el mapa o ingresa coordenadas válidas");
       return;
     }
 
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      toast.error("Las coordenadas están fuera de rango");
+      return;
+    }
+
+    const payload = {
+      nombre_punto: formData.nombre_punto.trim(),
+      direccion_fisica: formData.direccion_fisica.trim(),
+      latitud: lat,
+      longitud: lng,
+      horario_atencion: formData.horario_atencion.trim(),
+      contacto_referencia: formData.contacto_referencia.trim(),
+      estado_punto: formData.estado_punto,
+    };
+
     try {
       setSubmitting(true);
-      const nuevaUbicacion = await PuntosEntregaService.create({
-        nombre_punto: formData.nombre_punto.trim(),
-        direccion_fisica: formData.direccion_fisica.trim(),
-        latitud: lat,
-        longitud: lng,
-        horario_atencion: formData.horario_atencion.trim(),
-        contacto_referencia: formData.contacto_referencia.trim(),
-        estado_punto: formData.estado_punto,
-      });
 
-      toast.success(`Ubicación ${nuevaUbicacion.nombre_punto} creada exitosamente`);
-      navigate(`/ubicaciones/${nuevaUbicacion.id_punto_entrega}`);
+      if (isEditing && id) {
+        const actualizada = await PuntosEntregaService.update(id, payload);
+        rememberInactivePunto(actualizada);
+        toast.success(`Ubicación ${actualizada.nombre_punto} actualizada exitosamente`);
+        navigate(`/ubicaciones/${actualizada.id_punto_entrega || id}`);
+      } else {
+        const nuevaUbicacion = await PuntosEntregaService.create(payload);
+        rememberInactivePunto(nuevaUbicacion);
+        toast.success(
+          nuevaUbicacion.estado_punto === "Inactivo"
+            ? `Ubicación inactiva "${nuevaUbicacion.nombre_punto}" creada correctamente`
+            : `Ubicación ${nuevaUbicacion.nombre_punto} creada exitosamente`
+        );
+        navigate("/ubicaciones");
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al crear ubicación";
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : isEditing
+            ? "Error al actualizar ubicación"
+            : "Error al crear ubicación";
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Nueva Ubicación</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Ubicación" : "Nueva Ubicación"}
+        </h1>
         <p className="text-muted-foreground">
-          Registra un nuevo punto de entrega
+          {isEditing
+            ? "Modifica el punto de entrega y su ubicación en el mapa"
+            : "Registra un nuevo punto de entrega"}
         </p>
       </div>
 
@@ -124,6 +220,15 @@ export default function UbicacionNueva() {
                 placeholder="Ej: Calle Norte 45, Centro, Aguascalientes"
                 rows={3}
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ubicación en el mapa</Label>
+              <LocationMapPicker
+                lat={mapCoords.lat}
+                lng={mapCoords.lng}
+                onLocationChange={handleMapLocationChange}
               />
             </div>
 
@@ -216,6 +321,8 @@ export default function UbicacionNueva() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Guardando...
                   </>
+                ) : isEditing ? (
+                  "Guardar Cambios"
                 ) : (
                   "Crear Ubicación"
                 )}

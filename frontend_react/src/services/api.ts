@@ -408,7 +408,23 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+    let message = `HTTP Error ${response.status}: ${response.statusText}`;
+    try {
+      const errBody = await response.json();
+      if (typeof errBody?.error === "string") {
+        message = errBody.error;
+      } else if (errBody && typeof errBody === "object") {
+        message = Object.entries(errBody)
+          .map(([key, value]) => {
+            const text = Array.isArray(value) ? value.join(", ") : String(value);
+            return `${key}: ${text}`;
+          })
+          .join("; ");
+      }
+    } catch {
+      // Mantener mensaje HTTP genérico
+    }
+    throw new Error(message);
   }
 
   const data = await response.json();
@@ -772,10 +788,12 @@ export const EntregasService = {
       MOCK_ENTREGAS.push(newEntrega);
       return newEntrega;
     }
-    return fetchAPI<Entrega>("/entregas/", {
+    const raw = await fetchAPI<any>("/entregas/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    const created = await fetchAPI<any>(`/entregas/${raw.id}/detalle/`);
+    return normEntrega(created);
   },
 
   async update(id: string, data: Partial<Entrega>): Promise<Entrega> {
@@ -844,10 +862,12 @@ export const SolicitudesService = {
       MOCK_SOLICITUDES.push(newSolicitud);
       return newSolicitud;
     }
-    return fetchAPI<SolicitudRegalo>("/solicitudes/", {
+    const raw = await fetchAPI<any>("/solicitudes/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    const created = await fetchAPI<any>(`/solicitudes/${raw.id}/`);
+    return normSolicitud(created);
   },
 
   async update(id: string, data: Partial<SolicitudRegalo>): Promise<SolicitudRegalo> {
@@ -858,10 +878,11 @@ export const SolicitudesService = {
       MOCK_SOLICITUDES[index] = { ...MOCK_SOLICITUDES[index], ...data };
       return MOCK_SOLICITUDES[index];
     }
-    return fetchAPI<SolicitudRegalo>(`/solicitudes/${id}/`, {
+    const raw = await fetchAPI<any>(`/solicitudes/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+    return normSolicitud(raw);
   },
 
   async delete(id: string): Promise<void> {
@@ -916,10 +937,11 @@ export const PuntosEntregaService = {
       MOCK_PUNTOS_ENTREGA.push(newPunto);
       return newPunto;
     }
-    return fetchAPI<PuntoEntrega>("/puntos-entrega/", {
+    const raw = await fetchAPI<any>("/puntos-entrega/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    return normPuntoEntrega(raw);
   },
 
   async update(id: string, data: Partial<PuntoEntrega>): Promise<PuntoEntrega> {
@@ -930,10 +952,11 @@ export const PuntosEntregaService = {
       MOCK_PUNTOS_ENTREGA[index] = { ...MOCK_PUNTOS_ENTREGA[index], ...data };
       return MOCK_PUNTOS_ENTREGA[index];
     }
-    return fetchAPI<PuntoEntrega>(`/puntos-entrega/${id}/`, {
+    const raw = await fetchAPI<any>(`/puntos-entrega/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+    return normPuntoEntrega(raw);
   },
 
   async delete(id: string): Promise<void> {
