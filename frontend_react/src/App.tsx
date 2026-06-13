@@ -18,7 +18,7 @@ import AsignacionDetalle from "./pages/AsignacionDetalle";
 import Cartas from "./pages/Cartas";
 import CartaNueva from "./pages/CartaNueva";
 import CartaDetalle from "./pages/CartaDetalle";
-import Regalos from "./pages/Regalos";
+import EntregaDetalle from "./pages/EntregaDetalle";
 import Entregas from "./pages/Entregas";
 import Ubicaciones from "./pages/Ubicaciones";
 import UbicacionNueva from "./pages/UbicacionNueva";
@@ -58,8 +58,8 @@ const App = () => (
           <Route path="/cartas/nueva" element={<AdminLayout><CartaNueva /></AdminLayout>} />
           <Route path="/cartas/:id" element={<AdminLayout><CartaDetalle /></AdminLayout>} />
           <Route path="/cartas/:id/editar" element={<AdminLayout><CartaNueva /></AdminLayout>} />
-          <Route path="/regalos" element={<AdminLayout><Regalos /></AdminLayout>} />
           <Route path="/entregas" element={<AdminLayout><Entregas /></AdminLayout>} />
+          <Route path="/entregas/:id" element={<AdminLayout><EntregaDetalle /></AdminLayout>} />
           <Route path="/ubicaciones" element={<AdminLayout><Ubicaciones /></AdminLayout>} />
           <Route path="/ubicaciones/nueva" element={<AdminLayout><UbicacionNueva /></AdminLayout>} />
           <Route path="/ubicaciones/:id" element={<AdminLayout><UbicacionDetalle /></AdminLayout>} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye } from "lucide-react";
+import { Plus, Search, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -123,9 +123,9 @@ export default function Usuarios() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => navigate(`/usuarios/${usuario.id_admin}`)}
+                      onClick={() => navigate(`/usuarios/${usuario.id_admin}/editar`)}
                     >
-                      <Eye className="h-4 w-4" />
+                      <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>

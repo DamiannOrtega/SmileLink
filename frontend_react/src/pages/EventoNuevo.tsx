@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,15 +19,47 @@ import { EventosService } from "@/services/api";
 
 export default function EventoNuevo() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
+  
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre_evento: "",
     tipo_evento: "" as "Navidad" | "Día del Niño" | "Otro" | "",
     fecha_inicio: "",
     fecha_fin: "",
+    estado_evento: "Planeado" as "Planeado" | "Activo" | "Cerrado",
     descripcion: "",
   });
+
+  useEffect(() => {
+    if (isEditing && id) {
+      loadEvento();
+    }
+  }, [id, isEditing]);
+
+  const loadEvento = async () => {
+    try {
+      setLoading(true);
+      const ev = await EventosService.getById(id!);
+      if (ev) {
+        setFormData({
+          nombre_evento: ev.nombre_evento,
+          tipo_evento: ev.tipo_evento,
+          fecha_inicio: ev.fecha_inicio,
+          fecha_fin: ev.fecha_fin,
+          estado_evento: ev.estado_evento,
+          descripcion: ev.descripcion || "",
+        });
+      }
+    } catch (err) {
+      toast.error("Error al cargar los datos del evento");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -61,33 +93,61 @@ export default function EventoNuevo() {
 
     try {
       setSubmitting(true);
-      const nuevoEvento = await EventosService.create({
-        nombre_evento: formData.nombre_evento.trim(),
-        tipo_evento: formData.tipo_evento,
-        fecha_inicio: formData.fecha_inicio,
-        fecha_fin: formData.fecha_fin,
-        estado_evento: "Planeado",
-        descripcion: formData.descripcion.trim(),
-      });
+      if (isEditing && id) {
+        await EventosService.update(id, {
+          nombre_evento: formData.nombre_evento.trim(),
+          tipo_evento: formData.tipo_evento,
+          fecha_inicio: formData.fecha_inicio,
+          fecha_fin: formData.fecha_fin,
+          estado_evento: formData.estado_evento,
+          descripcion: formData.descripcion.trim(),
+        });
+        toast.success(`Evento ${formData.nombre_evento} actualizado exitosamente`);
+      } else {
+        await EventosService.create({
+          nombre_evento: formData.nombre_evento.trim(),
+          tipo_evento: formData.tipo_evento,
+          fecha_inicio: formData.fecha_inicio,
+          fecha_fin: formData.fecha_fin,
+          estado_evento: "Planeado",
+          descripcion: formData.descripcion.trim(),
+        });
+        toast.success(`Evento ${formData.nombre_evento} creado exitosamente`);
+      }
 
-      toast.success(`Evento ${nuevoEvento.nombre_evento} creado exitosamente`);
-      navigate(`/eventos/${nuevoEvento.id_evento}`);
+      navigate("/eventos");
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al crear evento";
+      const errorMsg = err instanceof Error ? err.message : "Error al guardar el evento";
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            {isEditing ? "Editar Evento" : "Nuevo Evento"}
+          </h1>
+          <p className="text-muted-foreground">Cargando datos del evento...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Nuevo Evento</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Evento" : "Nuevo Evento"}
+        </h1>
         <p className="text-muted-foreground">
-          Crea un nuevo evento para el programa
+          {isEditing ? "Modifica los datos del evento actual" : "Crea un nuevo evento para el programa"}
         </p>
       </div>
 
@@ -131,6 +191,29 @@ export default function EventoNuevo() {
                 </SelectContent>
               </Select>
             </div>
+
+            {isEditing && (
+              <div className="space-y-2">
+                <Label htmlFor="estado_evento">
+                  Estado del Evento <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={formData.estado_evento}
+                  onValueChange={(value: "Planeado" | "Activo" | "Cerrado") =>
+                    setFormData((prev) => ({ ...prev, estado_evento: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona el estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Planeado">Planeado</SelectItem>
+                    <SelectItem value="Activo">Activo</SelectItem>
+                    <SelectItem value="Cerrado">Cerrado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -187,10 +270,10 @@ export default function EventoNuevo() {
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
+                    Guardando...
                   </>
                 ) : (
-                  "Crear Evento"
+                  isEditing ? "Guardar Cambios" : "Crear Evento"
                 )}
               </Button>
             </div>

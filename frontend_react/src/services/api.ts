@@ -57,6 +57,13 @@ export interface Entrega {
   observaciones: string;
   id_punto_entrega: string; // FK to PuntoEntrega
   evidencia_foto_path?: string; // Path to encrypted image
+  evidencias_nosql?: Array<{
+    _id: string;
+    tipo: string;
+    url_archivo: string;
+    timestamp: string;
+    subido_por: string;
+  }>;
 }
 
 export interface SolicitudRegalo {
@@ -460,6 +467,7 @@ const normEntrega = (e: any): Entrega => ({
   observaciones: e.observaciones || '',
   id_punto_entrega: String(e.id_punto_entrega),
   evidencia_foto_path: undefined,
+  evidencias_nosql: Array.isArray(e.evidencias_nosql) ? e.evidencias_nosql : [],
 });
 
 const normSolicitud = (s: any): SolicitudRegalo => ({
@@ -739,7 +747,7 @@ export const EntregasService = {
       await delay();
       return MOCK_ENTREGAS.find((e) => e.id_entrega === id) || null;
     }
-    const raw = await fetchAPI<any>(`/entregas/${id}/`);
+    const raw = await fetchAPI<any>(`/entregas/${id}/detalle/`);
     return normEntrega(raw);
   },
 

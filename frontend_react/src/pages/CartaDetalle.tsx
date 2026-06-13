@@ -1,32 +1,81 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Pencil } from "lucide-react";
-import { getCartaById, getNiñoById, getEventoById } from "@/services/mockData";
+import { toast } from "sonner";
+import {
+  SolicitudesService,
+  SolicitudRegalo,
+  NinosService,
+  Nino,
+} from "@/services/api";
 
-const estadoColors = {
-  "Pendiente": "bg-yellow-500/10 text-yellow-500",
-  "Revisada": "bg-blue-500/10 text-blue-500",
-  "Aprobada": "bg-green-500/10 text-green-500",
-  "Rechazada": "bg-red-500/10 text-red-500",
+const estadoColors: Record<SolicitudRegalo["estado_solicitud"], string> = {
+  "Abierta": "bg-yellow-500/10 text-yellow-500",
+  "En Proceso": "bg-blue-500/10 text-blue-500",
+  "Cumplida": "bg-green-500/10 text-green-500",
 };
 
 export default function CartaDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const carta = id ? getCartaById(id) : null;
-  const niño = carta ? getNiñoById(carta.niñoId) : null;
-  const evento = carta ? getEventoById(carta.eventoId) : null;
+  
+  const [solicitud, setSolicitud] = useState<SolicitudRegalo | null>(null);
+  const [nino, setNino] = useState<Nino | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!carta) {
+  useEffect(() => {
+    loadData();
+  }, [id]);
+
+  const loadData = async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const sol = await SolicitudesService.getById(id);
+      if (!sol) {
+        setSolicitud(null);
+        return;
+      }
+      setSolicitud(sol);
+
+      const ninoData = await NinosService.getById(sol.id_nino);
+      setNino(ninoData);
+    } catch (err) {
+      toast.error("Error al cargar detalles de la solicitud");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <Skeleton className="h-12 w-1/4" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+        <Skeleton className="h-[200px] w-full" />
+      </div>
+    );
+  }
+
+  if (!solicitud) {
     return (
       <div className="space-y-6">
         <Breadcrumbs />
         <Card>
           <CardContent className="py-8">
-            <p className="text-center text-muted-foreground">Carta no encontrada</p>
+            <p className="text-center text-muted-foreground">Solicitud no encontrada</p>
+            <div className="flex justify-center mt-4">
+              <Button onClick={() => navigate("/cartas")}>Volver a la lista</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -43,9 +92,9 @@ export default function CartaDetalle() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Detalle de Carta</h1>
+            <h1 className="text-3xl font-bold text-foreground">Detalle de Solicitud/Carta</h1>
             <p className="text-muted-foreground">
-              Carta de {niño ? `${niño.nombre} ${niño.apellidos}` : "Desconocido"}
+              Carta de {nino ? nino.nombre : "Desconocido"}
             </p>
           </div>
         </div>
@@ -63,28 +112,36 @@ export default function CartaDetalle() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Niño</p>
-              <p className="text-base">
-                {niño ? `${niño.nombre} ${niño.apellidos}` : "Desconocido"}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Evento</p>
-              <p className="text-base">{evento?.nombre || "Sin evento"}</p>
+              <p className="text-base">{nino ? nino.nombre : "Desconocido"}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Estado</p>
-              <Badge className={estadoColors[carta.estado]}>{carta.estado}</Badge>
+              <Badge className={estadoColors[solicitud.estado_solicitud]}>
+                {solicitud.estado_solicitud}
+              </Badge>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Fecha de Carga</p>
               <p className="text-base">
-                {new Date(carta.fechaCarga).toLocaleDateString("es-MX", {
+                {new Date(solicitud.fecha_solicitud).toLocaleDateString("es-MX", {
                   year: "numeric",
                   month: "long",
                   day: "numeric",
                 })}
               </p>
             </div>
+            {solicitud.fecha_cierre && (
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Fecha de Cierre</p>
+                <p className="text-base">
+                  {new Date(solicitud.fecha_cierre).toLocaleDateString("es-MX", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -93,23 +150,19 @@ export default function CartaDetalle() {
             <CardTitle>Datos del Niño</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {niño ? (
+            {nino ? (
               <>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Edad</p>
-                  <p className="text-base">{niño.edad} años</p>
+                  <p className="text-base">{nino.edad} años</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Género</p>
-                  <p className="text-base">{niño.genero}</p>
+                  <p className="text-base">{nino.genero}</p>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Escuela</p>
-                  <p className="text-base">{niño.escuela}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Intereses</p>
-                  <p className="text-base">{niño.intereses}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Intereses y Descripción</p>
+                  <p className="text-base">{nino.descripcion || "No especificados"}</p>
                 </div>
               </>
             ) : (
@@ -121,11 +174,11 @@ export default function CartaDetalle() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Contenido de la Carta</CardTitle>
+          <CardTitle>Descripción de la Solicitud / Carta de Deseos</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="rounded-lg border bg-muted/30 p-6">
-            <p className="whitespace-pre-wrap text-foreground">{carta.contenido}</p>
+            <p className="whitespace-pre-wrap text-foreground">{solicitud.descripcion_solicitud}</p>
           </div>
         </CardContent>
       </Card>

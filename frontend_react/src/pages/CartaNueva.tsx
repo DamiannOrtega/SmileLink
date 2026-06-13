@@ -22,14 +22,13 @@ import {
 } from "@/components/ui/select";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { toast } from "sonner";
-import { getCartaById, niñosMock, eventosMock } from "@/services/mockData";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
+import { NinosService, Nino, SolicitudesService, SolicitudRegalo } from "@/services/api";
 
 const formSchema = z.object({
-  niñoId: z.string().min(1, "Debes seleccionar un niño"),
-  eventoId: z.string().min(1, "Debes seleccionar un evento"),
-  contenido: z.string().min(10, "El contenido debe tener al menos 10 caracteres"),
-  estado: z.enum(["Pendiente", "Revisada", "Aprobada", "Rechazada"]),
+  id_nino: z.string().min(1, "Debes seleccionar un niño"),
+  descripcion_solicitud: z.string().min(10, "El contenido debe tener al menos 10 caracteres"),
+  estado_solicitud: z.enum(["Abierta", "En Proceso", "Cumplida"]),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -38,36 +37,73 @@ export default function CartaNueva() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = Boolean(id);
+  const [ninos, setNinos] = useState<Nino[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      niñoId: "",
-      eventoId: "",
-      contenido: "",
-      estado: "Pendiente",
+      id_nino: "",
+      descripcion_solicitud: "",
+      estado_solicitud: "Abierta",
     },
   });
 
   useEffect(() => {
-    if (isEditing && id) {
-      const carta = getCartaById(id);
-      if (carta) {
-        form.reset({
-          niñoId: carta.niñoId,
-          eventoId: carta.eventoId,
-          contenido: carta.contenido,
-          estado: carta.estado,
-        });
-      }
-    }
-  }, [isEditing, id, form]);
+    loadInitialData();
+  }, [id]);
 
-  const onSubmit = (data: FormValues) => {
-    console.log(isEditing ? "Editando carta:" : "Nueva carta:", data);
-    toast.success(isEditing ? "Carta actualizada exitosamente" : "Carta registrada exitosamente");
-    navigate("/cartas");
+  const loadInitialData = async () => {
+    try {
+      setLoading(true);
+      const ninosData = await NinosService.getAll();
+      setNinos(ninosData);
+
+      if (isEditing && id) {
+        const sol = await SolicitudesService.getById(id);
+        if (sol) {
+          form.reset({
+            id_nino: sol.id_nino,
+            descripcion_solicitud: sol.descripcion_solicitud,
+            estado_solicitud: sol.estado_solicitud,
+          });
+        }
+      }
+    } catch (err) {
+      toast.error("Error al cargar datos");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      if (isEditing && id) {
+        await SolicitudesService.update(id, data);
+        toast.success("Solicitud actualizada exitosamente");
+      } else {
+        await SolicitudesService.create(data);
+        toast.success("Solicitud registrada exitosamente");
+      }
+      navigate("/cartas");
+    } catch (err) {
+      toast.error("Error al guardar la solicitud");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            {isEditing ? "Editar Solicitud" : "Registrar Solicitud"}
+          </h1>
+          <p className="text-muted-foreground">Cargando formulario...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -75,10 +111,10 @@ export default function CartaNueva() {
 
       <div>
         <h1 className="text-3xl font-bold text-foreground">
-          {isEditing ? "Editar Carta" : "Registrar Carta"}
+          {isEditing ? "Editar Solicitud de Regalo" : "Registrar Solicitud de Regalo"}
         </h1>
         <p className="text-muted-foreground">
-          {isEditing ? "Actualiza los datos de la carta" : "Ingresa los datos de la nueva carta de deseos"}
+          {isEditing ? "Actualiza los datos de la solicitud" : "Ingresa los deseos y peticiones de regalo del niño"}
         </p>
       </div>
 
@@ -86,25 +122,25 @@ export default function CartaNueva() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Información de la Carta</CardTitle>
+              <CardTitle>Información de la Solicitud / Carta de Deseos</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
               <FormField
                 control={form.control}
-                name="niñoId"
+                name="id_nino"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Niño</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isEditing}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecciona un niño" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {niñosMock.map((niño) => (
-                          <SelectItem key={niño.id} value={niño.id}>
-                            {niño.nombre} {niño.apellidos}
+                        {ninos.map((niño) => (
+                          <SelectItem key={niño.id_nino} value={niño.id_nino}>
+                            {niño.nombre}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -116,38 +152,13 @@ export default function CartaNueva() {
 
               <FormField
                 control={form.control}
-                name="eventoId"
+                name="descripcion_solicitud"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Evento</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un evento" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {eventosMock.map((evento) => (
-                          <SelectItem key={evento.id} value={evento.id}>
-                            {evento.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="contenido"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Contenido de la Carta</FormLabel>
+                    <FormLabel>Descripción de la Solicitud / Deseos</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Escribe aquí los deseos y peticiones del niño..."
+                        placeholder="Escribe aquí los deseos, juguetes o necesidades escolares que solicita el niño..."
                         className="min-h-[200px]"
                         {...field}
                       />
@@ -159,7 +170,7 @@ export default function CartaNueva() {
 
               <FormField
                 control={form.control}
-                name="estado"
+                name="estado_solicitud"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Estado</FormLabel>
@@ -170,10 +181,9 @@ export default function CartaNueva() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="Pendiente">Pendiente</SelectItem>
-                        <SelectItem value="Revisada">Revisada</SelectItem>
-                        <SelectItem value="Aprobada">Aprobada</SelectItem>
-                        <SelectItem value="Rechazada">Rechazada</SelectItem>
+                        <SelectItem value="Abierta">Abierta</SelectItem>
+                        <SelectItem value="En Proceso">En Proceso</SelectItem>
+                        <SelectItem value="Cumplida">Cumplida</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -184,7 +194,7 @@ export default function CartaNueva() {
           </Card>
 
           <div className="flex gap-4">
-            <Button type="submit">Guardar Carta</Button>
+            <Button type="submit">Guardar Solicitud</Button>
             <Button type="button" variant="outline" onClick={() => navigate("/cartas")}>
               Cancelar
             </Button>

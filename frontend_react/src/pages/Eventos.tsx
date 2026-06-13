@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Search, Eye, Calendar } from "lucide-react";
+import { Plus, Search, Pencil, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -130,9 +130,9 @@ export default function Eventos() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => navigate(`/eventos/${evento.id_evento}`)}
+                      onClick={() => navigate(`/eventos/${evento.id_evento}/editar`)}
                     >
-                      <Eye className="h-4 w-4" />
+                      <Pencil className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>

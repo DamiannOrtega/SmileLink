@@ -1,21 +1,77 @@
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import {
-  asignacionesMock,
-  getNiñoById,
-  getPadrinoById,
-  getEventoById,
-} from "@/services/mockData";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Pencil, ArrowLeft, User, Heart, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import {
+  ApadrinamientosService,
+  Apadrinamiento,
+  NinosService,
+  Nino,
+  PadrinosService,
+  Padrino,
+  EventosService,
+  Evento,
+} from "@/services/api";
 
 export default function AsignacionDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const asignacion = asignacionesMock.find((a) => a.id === id);
+
+  const [asignacion, setAsignacion] = useState<Apadrinamiento | null>(null);
+  const [nino, setNino] = useState<Nino | null>(null);
+  const [padrino, setPadrino] = useState<Padrino | null>(null);
+  const [evento, setEvento] = useState<Evento | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadData();
+  }, [id]);
+
+  const loadData = async () => {
+    if (!id) return;
+    try {
+      setLoading(true);
+      const asig = await ApadrinamientosService.getById(id);
+      if (!asig) {
+        setAsignacion(null);
+        return;
+      }
+      setAsignacion(asig);
+
+      const [ninoData, padrinoData, eventoData] = await Promise.all([
+        NinosService.getById(asig.id_nino),
+        PadrinosService.getById(asig.id_padrino),
+        asig.id_evento ? EventosService.getById(asig.id_evento) : Promise.resolve(null),
+      ]);
+
+      setNino(ninoData);
+      setPadrino(padrinoData);
+      setEvento(eventoData);
+    } catch (err) {
+      toast.error("Error al cargar detalles de la asignación");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <Skeleton className="h-12 w-1/4" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+        <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
 
   if (!asignacion) {
     return (
@@ -24,15 +80,14 @@ export default function AsignacionDetalle() {
         <Card>
           <CardContent className="py-8">
             <p className="text-center text-muted-foreground">Asignación no encontrada</p>
+            <div className="flex justify-center mt-4">
+              <Button onClick={() => navigate("/asignaciones")}>Volver a la lista</Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
-
-  const niño = getNiñoById(asignacion.niñoId);
-  const padrino = getPadrinoById(asignacion.padrinoId);
-  const evento = getEventoById(asignacion.eventoId);
 
   return (
     <div className="space-y-6">
@@ -66,28 +121,26 @@ export default function AsignacionDetalle() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Nombre Completo</p>
-              <p className="font-medium">
-                {niño?.nombre} {niño?.apellidos}
-              </p>
+              <p className="font-medium">{nino?.nombre || "Desconocido"}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">Edad</p>
-                <p className="font-medium">{niño?.edad} años</p>
+                <p className="font-medium">{nino?.edad} años</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Género</p>
-                <p className="font-medium">{niño?.genero}</p>
+                <p className="font-medium">{nino?.genero}</p>
               </div>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Escuela</p>
-              <p className="font-medium">{niño?.escuela}</p>
+              <p className="text-sm text-muted-foreground">Descripción</p>
+              <p className="font-medium line-clamp-2">{nino?.descripcion || "Sin descripción"}</p>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/ninos/${niño?.id}`)}
+              onClick={() => navigate(`/ninos/${nino?.id_nino}`)}
             >
               Ver perfil completo
             </Button>
@@ -104,9 +157,7 @@ export default function AsignacionDetalle() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Nombre Completo</p>
-              <p className="font-medium">
-                {padrino?.nombre} {padrino?.apellidos}
-              </p>
+              <p className="font-medium">{padrino?.nombre || "Desconocido"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Email</p>
@@ -114,16 +165,16 @@ export default function AsignacionDetalle() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Teléfono</p>
-              <p className="font-medium">{padrino?.telefono}</p>
+              <p className="font-medium">{padrino?.telefono || "No especificado"}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Niños Apadrinados</p>
-              <p className="font-medium">{padrino?.niñosApadrinados}</p>
+              <p className="text-sm text-muted-foreground">Dirección</p>
+              <p className="font-medium line-clamp-1">{padrino?.direccion || "No especificada"}</p>
             </div>
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/padrinos/${padrino?.id}`)}
+              onClick={() => navigate(`/padrinos/${padrino?.id_padrino}`)}
             >
               Ver perfil completo
             </Button>
@@ -142,26 +193,19 @@ export default function AsignacionDetalle() {
           <div className="grid md:grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Evento</p>
-              <p className="font-medium">{evento?.nombre || asignacion.eventoId}</p>
+              <p className="font-medium">{evento?.nombre_evento || "Sin evento especial"}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Estado</p>
-              <Badge>{asignacion.estado}</Badge>
+              <Badge>{asignacion.estado_apadrinamiento_registro}</Badge>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Fecha de Creación</p>
               <p className="font-medium">
-                {new Date(asignacion.fechaCreacion).toLocaleDateString()}
+                {new Date(asignacion.fecha_inicio).toLocaleDateString()}
               </p>
             </div>
           </div>
-
-          {asignacion.notas && (
-            <div>
-              <p className="text-sm text-muted-foreground">Notas</p>
-              <p className="font-medium">{asignacion.notas}</p>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -170,23 +214,13 @@ export default function AsignacionDetalle() {
           <CardTitle>Acciones Disponibles</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-4">
-          {asignacion.estado === "Pendiente" && (
-            <Button onClick={() => toast.success("Asignación aceptada")}>
-              Marcar como Aceptado
+          {asignacion.estado_apadrinamiento_registro === "Activo" && (
+            <Button onClick={() => toast.success("Entrega de regalo iniciada")}>
+              Registrar Entrega de Regalo
             </Button>
           )}
-          {asignacion.estado === "Aceptado" && (
-            <Button onClick={() => toast.success("Entrega registrada")}>
-              Registrar Entrega
-            </Button>
-          )}
-          {asignacion.estado === "Entrega registrada" && (
-            <Button onClick={() => toast.success("Entrega verificada")}>
-              Verificar Entrega
-            </Button>
-          )}
-          <Button variant="destructive" onClick={() => toast.error("Asignación cancelada")}>
-            Cancelar Asignación
+          <Button variant="destructive" onClick={() => toast.error("Asignación inactiva")}>
+            Marcar como Finalizado
           </Button>
         </CardContent>
       </Card>

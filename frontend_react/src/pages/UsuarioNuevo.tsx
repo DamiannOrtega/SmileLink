@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +18,11 @@ import { AdministradoresService } from "@/services/api";
 
 export default function UsuarioNuevo() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
+
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -26,6 +30,31 @@ export default function UsuarioNuevo() {
     password: "",
     rol: "" as "Superadmin" | "Gestor" | "",
   });
+
+  useEffect(() => {
+    if (isEditing && id) {
+      loadUsuario();
+    }
+  }, [id, isEditing]);
+
+  const loadUsuario = async () => {
+    try {
+      setLoading(true);
+      const user = await AdministradoresService.getById(id!);
+      if (user) {
+        setFormData({
+          nombre: user.nombre,
+          email: user.email,
+          password: "", // No se precarga la contraseña por seguridad
+          rol: user.rol,
+        });
+      }
+    } catch (err) {
+      toast.error("Error al cargar los datos del usuario");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement>
@@ -47,8 +76,14 @@ export default function UsuarioNuevo() {
       return;
     }
 
-    if (!formData.password || formData.password.length < 6) {
+    // La contraseña es requerida sólo al crear
+    if (!isEditing && (!formData.password || formData.password.length < 6)) {
       toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    if (isEditing && formData.password && formData.password.length < 6) {
+      toast.error("La nueva contraseña debe tener al menos 6 caracteres");
       return;
     }
 
@@ -60,35 +95,66 @@ export default function UsuarioNuevo() {
     try {
       setSubmitting(true);
 
-      // En producción, aquí se haría un hash de la contraseña
-      const password_hash = `sha256_${formData.password}`;
+      if (isEditing && id) {
+        // Enviar actualización de datos básicos
+        const updateData: any = {
+          nombre: formData.nombre.trim(),
+          email: formData.email.trim(),
+          rol: formData.rol,
+        };
+        
+        // Si el administrador cambió su contraseña en el edit, la enviamos hasheada (si el serializer lo soporta, aunque comúnmente no)
+        if (formData.password) {
+          updateData.password_hash = `sha256_${formData.password}`;
+        }
 
-      const nuevoUsuario = await AdministradoresService.create({
-        nombre: formData.nombre.trim(),
-        email: formData.email.trim(),
-        password_hash: password_hash,
-        rol: formData.rol,
-        fecha_registro: new Date().toISOString().split("T")[0],
-      });
+        await AdministradoresService.update(id, updateData);
+        toast.success(`Usuario ${formData.nombre} actualizado exitosamente`);
+      } else {
+        const password_hash = `sha256_${formData.password}`;
+        await AdministradoresService.create({
+          nombre: formData.nombre.trim(),
+          email: formData.email.trim(),
+          password_hash: password_hash,
+          rol: formData.rol,
+          fecha_registro: new Date().toISOString().split("T")[0],
+        });
+        toast.success(`Usuario ${formData.nombre} creado exitosamente`);
+      }
 
-      toast.success(`Usuario ${nuevoUsuario.nombre} creado exitosamente`);
-      navigate(`/usuarios/${nuevoUsuario.id_admin}`);
+      navigate("/usuarios");
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al crear usuario";
+      const errorMsg = err instanceof Error ? err.message : "Error al guardar usuario";
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">
+            {isEditing ? "Editar Usuario" : "Nuevo Usuario"}
+          </h1>
+          <p className="text-muted-foreground">Cargando datos del usuario...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Nuevo Usuario</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Usuario" : "Nuevo Usuario"}
+        </h1>
         <p className="text-muted-foreground">
-          Registra un nuevo administrador del sistema
+          {isEditing ? "Modifica los datos del administrador del sistema" : "Registra un nuevo administrador del sistema"}
         </p>
       </div>
 
@@ -129,7 +195,7 @@ export default function UsuarioNuevo() {
 
             <div className="space-y-2">
               <Label htmlFor="password">
-                Contraseña <span className="text-destructive">*</span>
+                Contraseña {!isEditing && <span className="text-destructive">*</span>}
               </Label>
               <Input
                 id="password"
@@ -137,12 +203,12 @@ export default function UsuarioNuevo() {
                 type="password"
                 value={formData.password}
                 onChange={handleInputChange}
-                placeholder="Mínimo 6 caracteres"
-                required
+                placeholder={isEditing ? "Dejar en blanco para no modificar" : "Mínimo 6 caracteres"}
+                required={!isEditing}
                 minLength={6}
               />
               <p className="text-xs text-muted-foreground">
-                La contraseña debe tener al menos 6 caracteres
+                {isEditing ? "Ingresa una nueva contraseña si deseas cambiar la actual (mínimo 6 caracteres)" : "La contraseña debe tener al menos 6 caracteres"}
               </p>
             </div>
 
@@ -179,10 +245,10 @@ export default function UsuarioNuevo() {
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
+                    Guardando...
                   </>
                 ) : (
-                  "Crear Usuario"
+                  isEditing ? "Guardar Cambios" : "Crear Usuario"
                 )}
               </Button>
             </div>
