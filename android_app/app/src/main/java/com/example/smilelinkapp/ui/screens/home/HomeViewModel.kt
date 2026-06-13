@@ -61,8 +61,8 @@ class HomeViewModel : ViewModel() {
         
         return ninos.filter { nino ->
             nino.nombre.contains(query, ignoreCase = true) ||
-            nino.descripcion.contains(query, ignoreCase = true) ||
-            nino.necesidades.any { it.contains(query, ignoreCase = true) }
+            (nino.descripcion?.contains(query, ignoreCase = true) ?: false) ||
+            (nino.necesidades?.any { it.contains(query, ignoreCase = true) } ?: false)
         }
     }
 }

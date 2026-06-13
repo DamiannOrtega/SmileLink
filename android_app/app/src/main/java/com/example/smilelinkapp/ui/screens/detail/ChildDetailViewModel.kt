@@ -11,7 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.time.LocalDate
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.UUID
 
 sealed class ChildDetailUiState {
@@ -67,7 +69,7 @@ class ChildDetailViewModel(application: Application) : AndroidViewModel(applicat
                 idApadrinamiento = apadrinamientoId,
                 idPadrino = padrinoId,
                 idNino = childId,
-                fechaInicio = LocalDate.now().toString(),
+                fechaInicio = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()),
                 tipoApadrinamiento = "Elección Padrino",
                 estadoApadrinamientoRegistro = "Activo"
             )

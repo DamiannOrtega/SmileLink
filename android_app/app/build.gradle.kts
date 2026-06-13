@@ -67,6 +67,7 @@ dependencies {
     
     // Image Loading
     implementation(libs.coil.compose)
+    implementation(libs.coil.svg)
     
     // Google Maps
     implementation(libs.maps.compose)

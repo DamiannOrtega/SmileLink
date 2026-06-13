@@ -66,6 +66,14 @@ fun ChildDetailScreen(
             
             is ChildDetailUiState.Success -> {
                 var errorMessage by remember { mutableStateOf<String?>(null) }
+                val context = androidx.compose.ui.platform.LocalContext.current
+                
+                LaunchedEffect(errorMessage) {
+                    errorMessage?.let {
+                        android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+                        errorMessage = null
+                    }
+                }
                 
                 ChildDetailContent(
                     nino = state.nino,
@@ -185,7 +193,7 @@ private fun ChildDetailContent(
                     )
                     
                     Text(
-                        text = nino.descripcion,
+                        text = nino.descripcion ?: "",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -194,53 +202,56 @@ private fun ChildDetailContent(
                 Divider()
                 
                 // Wish letter section
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MintGreen.copy(alpha = 0.1f)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                val needs = nino.necesidades
+                if (!needs.isNullOrEmpty()) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MintGreen.copy(alpha = 0.1f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(
-                                text = "✉️",
-                                style = MaterialTheme.typography.headlineSmall
-                            )
-                            Text(
-                                text = "Mi Carta de Deseos",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                        
-                        Text(
-                            text = "Estas son las cosas que más necesito:",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        
-                        nino.necesidades.forEach { necesidad ->
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Surface(
-                                    color = OceanBlue,
-                                    shape = CircleShape,
-                                    modifier = Modifier.size(8.dp)
-                                ) {}
-                                
                                 Text(
-                                    text = necesidad,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    text = "✉️",
+                                    style = MaterialTheme.typography.headlineSmall
+                                )
+                                Text(
+                                    text = "Mi Carta de Deseos",
+                                    style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                            }
+                            
+                            Text(
+                                text = "Estas son las cosas que más necesito:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            
+                            needs.forEach { necesidad ->
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = OceanBlue,
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(8.dp)
+                                    ) {}
+                                    
+                                    Text(
+                                        text = necesidad,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }

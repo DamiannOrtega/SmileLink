@@ -53,11 +53,12 @@ class SessionManager(context: Context) {
         }
     }
     
-    /**
-     * Get padrino ID
-     */
     fun getPadrinoId(): String? {
-        return prefs.getString(KEY_PADRINO_ID, null)
+        val id = prefs.getString(KEY_PADRINO_ID, null)
+        if (id.isNullOrEmpty()) {
+            return getPadrino()?.idPadrino
+        }
+        return id
     }
     
     /**

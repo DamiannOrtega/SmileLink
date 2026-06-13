@@ -22,6 +22,10 @@ import coil.compose.AsyncImage
 import com.example.smilelinkapp.ui.components.EmptyState
 import com.example.smilelinkapp.ui.components.ErrorMessage
 import com.example.smilelinkapp.ui.components.LoadingIndicator
+import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.smilelinkapp.ui.theme.SuccessGreen
 import com.example.smilelinkapp.ui.theme.WarningOrange
 
@@ -32,6 +36,50 @@ fun MyChildrenScreen(
     viewModel: MyChildrenViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var selectedDeliveryId by remember { mutableStateOf<String?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
+    
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        val deliveryId = selectedDeliveryId
+        if (uri != null && deliveryId != null) {
+            isUploading = true
+            viewModel.uploadEvidence(
+                context = context,
+                entregaId = deliveryId,
+                uri = uri,
+                onSuccess = {
+                    isUploading = false
+                    Toast.makeText(context, "Evidencia anexada correctamente", Toast.LENGTH_SHORT).show()
+                },
+                onError = { error ->
+                    isUploading = false
+                    Toast.makeText(context, "Error: $error", Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+        selectedDeliveryId = null
+    }
+
+    if (isUploading) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Subiendo evidencia") },
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp)
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    Text("Guardando archivo y metadatos...", style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {}
+        )
+    }
     
     Scaffold(
         topBar = {
@@ -65,7 +113,11 @@ fun MyChildrenScreen(
                     items(state.children) { childInfo ->
                         SponsoredChildCard(
                             childInfo = childInfo,
-                            onClick = { onChildClick(childInfo.nino.idNino) }
+                            onClick = { onChildClick(childInfo.nino.idNino) },
+                            onUploadEvidence = { entrega ->
+                                selectedDeliveryId = entrega.idEntrega
+                                launcher.launch("image/*")
+                            }
                         )
                     }
                 }
@@ -92,7 +144,8 @@ fun MyChildrenScreen(
 @Composable
 private fun SponsoredChildCard(
     childInfo: SponsoredChildInfo,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onUploadEvidence: (Entrega) -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -163,7 +216,10 @@ private fun SponsoredChildCard(
                 )
                 
                 childInfo.entregas.forEach { entrega ->
-                    DeliveryStatusItem(entrega)
+                    DeliveryStatusItem(
+                        entrega = entrega,
+                        onUploadEvidence = onUploadEvidence
+                    )
                 }
             } else {
                 Row(
@@ -188,7 +244,10 @@ private fun SponsoredChildCard(
 }
 
 @Composable
-private fun DeliveryStatusItem(entrega: Entrega) {
+private fun DeliveryStatusItem(
+    entrega: Entrega,
+    onUploadEvidence: (Entrega) -> Unit
+) {
     val (icon, color, statusText) = when (entrega.estadoEntrega) {
         "Entregado" -> Triple(Icons.Default.CheckCircle, SuccessGreen, "Entregado")
         "En Proceso" -> Triple(Icons.Default.Info, WarningOrange, "En proceso")
@@ -227,6 +286,28 @@ private fun DeliveryStatusItem(entrega: Entrega) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            
+            if (entrega.mongoEvidenciaId.isNullOrBlank()) {
+                Button(
+                    onClick = { onUploadEvidence(entrega) },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("Anexar", style = MaterialTheme.typography.labelMedium)
+                }
+            } else {
+                Surface(
+                    color = SuccessGreen.copy(alpha = 0.2f),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        text = "Evidencia ✓",
+                        color = SuccessGreen,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             }
         }
     }

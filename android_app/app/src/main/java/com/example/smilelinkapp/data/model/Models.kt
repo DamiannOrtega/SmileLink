@@ -19,10 +19,10 @@ data class Nino(
     val genero: String, // "Masculino" or "Femenino"
     
     @SerializedName("descripcion")
-    val descripcion: String,
+    val descripcion: String? = null,
     
     @SerializedName("necesidades")
-    val necesidades: List<String>,
+    val necesidades: List<String>? = null,
     
     @SerializedName("id_padrino_actual")
     val idPadrinoActual: String? = null,
@@ -127,7 +127,10 @@ data class Entrega(
     val idPuntoEntrega: String,
     
     @SerializedName("evidencia_foto_path")
-    val evidenciaFotoPath: String? = null
+    val evidenciaFotoPath: String? = null,
+    
+    @SerializedName("mongo_evidencia_id")
+    val mongoEvidenciaId: String? = null
 )
 
 /**

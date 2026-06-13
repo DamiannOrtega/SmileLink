@@ -78,14 +78,15 @@ fun ChildCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                if (nino.necesidades.isNotEmpty()) {
+                val needs = nino.necesidades
+                if (!needs.isNullOrEmpty()) {
                     Surface(
                         color = MintGreen.copy(alpha = 0.2f),
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.padding(top = 4.dp)
                     ) {
                         Text(
-                            text = "Necesita: ${nino.necesidades.first()}",
+                            text = "Necesita: ${needs.first()}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
