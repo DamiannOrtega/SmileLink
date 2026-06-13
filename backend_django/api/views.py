@@ -864,6 +864,7 @@ class DashboardViewSet(viewsets.ViewSet):
                 'bitacora_eventos':         safe_count('bitacora_eventos'),
                 'cartas':                   safe_count('cartas'),
                 'historial_notificaciones': safe_count('historial_notificaciones'),
+                'ninos_fotos':              safe_count('ninos_fotos'),
             }
 
             # ── Eventos por Tabla ────────────────────────────────────────────

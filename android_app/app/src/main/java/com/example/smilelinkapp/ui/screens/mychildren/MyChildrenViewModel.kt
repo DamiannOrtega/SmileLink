@@ -8,6 +8,8 @@ import com.example.smilelinkapp.data.model.Apadrinamiento
 import com.example.smilelinkapp.data.model.Entrega
 import com.example.smilelinkapp.data.model.Nino
 import com.example.smilelinkapp.data.repository.SmileLinkRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,53 +51,61 @@ class MyChildrenViewModel(application: Application) : AndroidViewModel(applicati
     fun loadSponsoredChildren() {
         viewModelScope.launch {
             _uiState.value = MyChildrenUiState.Loading
-            
-            // Get current padrino from session
+
             val currentPadrinoId = sessionManager.getPadrinoId()
-            
             if (currentPadrinoId == null) {
                 _uiState.value = MyChildrenUiState.Error("No hay sesión activa")
                 return@launch
             }
-            
+
             try {
-                // Get sponsorships for current padrino
+                // 1. Fetch all sponsorships for this padrino
                 val apadrinamientosResult = repository.getApadrinamientosForPadrino(currentPadrinoId)
-                
                 if (apadrinamientosResult.isFailure) {
                     _uiState.value = MyChildrenUiState.Error(
                         apadrinamientosResult.exceptionOrNull()?.message ?: "Error al cargar apadrinamientos"
                     )
                     return@launch
                 }
-                
+
                 val apadrinamientos = apadrinamientosResult.getOrNull() ?: emptyList()
-                
                 if (apadrinamientos.isEmpty()) {
                     _uiState.value = MyChildrenUiState.Empty
                     return@launch
                 }
-                
-                // Get details for each sponsored child
-                val childrenInfo = mutableListOf<SponsoredChildInfo>()
-                
-                for (apadrinamiento in apadrinamientos) {
-                    val ninoResult = repository.getNino(apadrinamiento.idNino)
-                    val entregasResult = repository.getEntregasForApadrinamiento(apadrinamiento.idApadrinamiento)
-                    
-                    if (ninoResult.isSuccess) {
-                        childrenInfo.add(
-                            SponsoredChildInfo(
-                                nino = ninoResult.getOrNull()!!,
-                                apadrinamiento = apadrinamiento,
-                                entregas = entregasResult.getOrNull() ?: emptyList()
-                            )
-                        )
+
+                // 2. Load all niños and entregas IN PARALLEL (one async per sponsorship)
+                val childrenInfo = apadrinamientos
+                    .map { apadrinamiento ->
+                        async {
+                            // Fetch niño and entregas concurrently for this sponsorship
+                            val ninoDeferred = async {
+                                repository.getNino(apadrinamiento.idNino)
+                            }
+                            val entregasDeferred = async {
+                                repository.getEntregasForApadrinamiento(apadrinamiento.idApadrinamiento)
+                            }
+                            val ninoResult = ninoDeferred.await()
+                            val entregasResult = entregasDeferred.await()
+
+                            if (ninoResult.isSuccess) {
+                                SponsoredChildInfo(
+                                    nino = ninoResult.getOrNull()!!,
+                                    apadrinamiento = apadrinamiento,
+                                    entregas = entregasResult.getOrNull() ?: emptyList()
+                                )
+                            } else null
+                        }
                     }
+                    .awaitAll()
+                    .filterNotNull()
+
+                _uiState.value = if (childrenInfo.isEmpty()) {
+                    MyChildrenUiState.Empty
+                } else {
+                    MyChildrenUiState.Success(childrenInfo)
                 }
-                
-                _uiState.value = MyChildrenUiState.Success(childrenInfo)
-                
+
             } catch (e: Exception) {
                 _uiState.value = MyChildrenUiState.Error(e.message ?: "Error desconocido")
             }

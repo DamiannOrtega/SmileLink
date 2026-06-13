@@ -723,6 +723,7 @@ export default function Dashboard() {
                       layout="vertical"
                       data={[
                         { name: "Evidencias", cantidad: nosqlStats?.documentos_totales.evidencias ?? 0 },
+                        { name: "Fotos Niños", cantidad: (nosqlStats?.documentos_totales as any)?.ninos_fotos ?? 0 },
                         { name: "Cartas", cantidad: nosqlStats?.documentos_totales.cartas ?? 0 },
                         { name: "Notificaciones", cantidad: nosqlStats?.documentos_totales.historial_notificaciones ?? 0 },
                         { name: "Bitácora", cantidad: nosqlStats?.documentos_totales.bitacora_eventos ?? 0 }
@@ -731,12 +732,13 @@ export default function Dashboard() {
                     >
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
                       <XAxis type="number" stroke="currentColor" className="text-muted-foreground text-xs" />
-                      <YAxis dataKey="name" type="category" stroke="currentColor" className="text-muted-foreground text-xs" />
+                      <YAxis dataKey="name" type="category" stroke="currentColor" className="text-muted-foreground text-xs" width={90} />
                       <Tooltip 
                         contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
                       />
-                      <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} barSize={20}>
+                      <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} barSize={18}>
                         <Cell fill="#10b981" />
+                        <Cell fill="#06b6d4" />
                         <Cell fill="#f59e0b" />
                         <Cell fill="#8b5cf6" />
                         <Cell fill="#3b82f6" />
@@ -746,8 +748,9 @@ export default function Dashboard() {
                     <BarChart 
                       data={[
                         { name: "Evidencias", cantidad: nosqlStats?.documentos_totales.evidencias ?? 0 },
+                        { name: "Fotos", cantidad: (nosqlStats?.documentos_totales as any)?.ninos_fotos ?? 0 },
                         { name: "Cartas", cantidad: nosqlStats?.documentos_totales.cartas ?? 0 },
-                        { name: "Notificaciones", cantidad: nosqlStats?.documentos_totales.historial_notificaciones ?? 0 },
+                        { name: "Notif.", cantidad: nosqlStats?.documentos_totales.historial_notificaciones ?? 0 },
                         { name: "Bitácora", cantidad: nosqlStats?.documentos_totales.bitacora_eventos ?? 0 }
                       ]} 
                       margin={{ top: 20, right: 10, left: -20, bottom: 5 }}
