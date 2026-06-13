@@ -539,10 +539,12 @@ export const NinosService = {
       MOCK_NINOS.push(newNino);
       return newNino;
     }
-    return fetchAPI<Nino>("/ninos/", {
+    const raw = await fetchAPI<any>("/ninos/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    const created = await fetchAPI<any>(`/ninos/${raw.id}/`);
+    return normNino(created);
   },
 
   async update(id: string, data: Partial<Nino>): Promise<Nino> {
@@ -553,10 +555,11 @@ export const NinosService = {
       MOCK_NINOS[index] = { ...MOCK_NINOS[index], ...data };
       return MOCK_NINOS[index];
     }
-    return fetchAPI<Nino>(`/ninos/${id}/`, {
+    const raw = await fetchAPI<any>(`/ninos/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+    return normNino(raw);
   },
 
   async delete(id: string): Promise<void> {
@@ -602,10 +605,12 @@ export const PadrinosService = {
       MOCK_PADRINOS.push(newPadrino);
       return newPadrino;
     }
-    return fetchAPI<Padrino>("/padrinos/", {
+    const raw = await fetchAPI<any>("/padrinos/", {
       method: "POST",
       body: JSON.stringify(data),
     });
+    const created = await fetchAPI<any>(`/padrinos/${raw.id}/`);
+    return normPadrino(created);
   },
 
   async update(id: string, data: Partial<Padrino>): Promise<Padrino> {
@@ -616,10 +621,12 @@ export const PadrinosService = {
       MOCK_PADRINOS[index] = { ...MOCK_PADRINOS[index], ...data };
       return MOCK_PADRINOS[index];
     }
-    return fetchAPI<Padrino>(`/padrinos/${id}/`, {
+    await fetchAPI<any>(`/padrinos/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+    const updated = await fetchAPI<any>(`/padrinos/${id}/`);
+    return normPadrino(updated);
   },
 
   async delete(id: string): Promise<void> {

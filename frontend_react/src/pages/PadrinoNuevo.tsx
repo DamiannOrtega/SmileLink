@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,10 @@ import { PadrinosService } from "@/services/api";
 
 export default function PadrinoNuevo() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(isEditing);
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -20,6 +23,36 @@ export default function PadrinoNuevo() {
     telefono: "",
     direccion: "",
   });
+
+  useEffect(() => {
+    if (!isEditing || !id) return;
+
+    const loadPadrino = async () => {
+      try {
+        setLoading(true);
+        const padrino = await PadrinosService.getById(id);
+        if (!padrino) {
+          toast.error("Padrino no encontrado");
+          navigate("/padrinos");
+          return;
+        }
+
+        setFormData({
+          nombre: padrino.nombre,
+          email: padrino.email,
+          telefono: padrino.telefono || "",
+          direccion: padrino.direccion || "",
+        });
+      } catch {
+        toast.error("Error al cargar datos del padrino");
+        navigate("/padrinos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPadrino();
+  }, [id, isEditing, navigate]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -43,33 +76,66 @@ export default function PadrinoNuevo() {
 
     try {
       setSubmitting(true);
-      const nuevoPadrino = await PadrinosService.create({
-        nombre: formData.nombre.trim(),
-        email: formData.email.trim(),
-        telefono: formData.telefono.trim(),
-        direccion: formData.direccion.trim(),
-        fecha_registro: new Date().toISOString().split("T")[0],
-        historial_apadrinamiento_ids: [],
-      });
 
-      toast.success(`Padrino ${nuevoPadrino.nombre} registrado exitosamente`);
-      navigate(`/padrinos/${nuevoPadrino.id_padrino}`);
+      if (isEditing && id) {
+        const padrinoActualizado = await PadrinosService.update(id, {
+          nombre: formData.nombre.trim(),
+          email: formData.email.trim(),
+          telefono: formData.telefono.trim(),
+          direccion: formData.direccion.trim(),
+        });
+
+        toast.success(`Padrino ${padrinoActualizado.nombre} actualizado exitosamente`);
+        navigate(`/padrinos/${padrinoActualizado.id_padrino || id}`);
+      } else {
+        const nuevoPadrino = await PadrinosService.create({
+          nombre: formData.nombre.trim(),
+          email: formData.email.trim(),
+          telefono: formData.telefono.trim(),
+          direccion: formData.direccion.trim(),
+          fecha_registro: new Date().toISOString().split("T")[0],
+          historial_apadrinamiento_ids: [],
+        });
+
+        toast.success(`Padrino ${nuevoPadrino.nombre} registrado exitosamente`);
+        navigate(`/padrinos/${nuevoPadrino.id_padrino}`);
+      }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Error al registrar padrino";
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : isEditing
+            ? "Error al actualizar padrino"
+            : "Error al registrar padrino";
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Breadcrumbs />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs />
 
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Registrar Nuevo Padrino</h1>
+        <h1 className="text-3xl font-bold text-foreground">
+          {isEditing ? "Editar Padrino" : "Registrar Nuevo Padrino"}
+        </h1>
         <p className="text-muted-foreground">
-          Completa el formulario para agregar un nuevo padrino
+          {isEditing
+            ? "Modifica los datos del padrino y guarda los cambios"
+            : "Completa el formulario para agregar un nuevo padrino"}
         </p>
       </div>
 
@@ -146,6 +212,8 @@ export default function PadrinoNuevo() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Guardando...
                   </>
+                ) : isEditing ? (
+                  "Guardar Cambios"
                 ) : (
                   "Registrar Padrino"
                 )}

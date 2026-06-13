@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,10 @@ import { NinosService, Nino } from "@/services/api";
 
 export default function NinoNuevoRefactored() {
     const navigate = useNavigate();
+    const { id } = useParams();
+    const isEditing = Boolean(id);
     const [submitting, setSubmitting] = useState(false);
+    const [loading, setLoading] = useState(isEditing);
 
     // Estado del formulario
     const [formData, setFormData] = useState({
@@ -30,8 +33,40 @@ export default function NinoNuevoRefactored() {
         genero: "" as "Masculino" | "Femenino" | "",
         descripcion: "",
         necesidades: "",
-        estado_apadrinamiento: "Disponible" as const,
+        estado_apadrinamiento: "Disponible" as "Disponible" | "Apadrinado",
     });
+
+    useEffect(() => {
+        if (!isEditing || !id) return;
+
+        const loadNino = async () => {
+            try {
+                setLoading(true);
+                const nino = await NinosService.getById(id);
+                if (!nino) {
+                    toast.error("Niño no encontrado");
+                    navigate("/ninos");
+                    return;
+                }
+
+                setFormData({
+                    nombre: nino.nombre,
+                    edad: nino.edad,
+                    genero: nino.genero,
+                    descripcion: nino.descripcion || "",
+                    necesidades: nino.necesidades?.join(", ") || "",
+                    estado_apadrinamiento: nino.estado_apadrinamiento,
+                });
+            } catch {
+                toast.error("Error al cargar datos del niño");
+                navigate("/ninos");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadNino();
+    }, [id, isEditing, navigate]);
 
     const handleInputChange = (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -72,40 +107,73 @@ export default function NinoNuevoRefactored() {
         try {
             setSubmitting(true);
 
-            // ✅ CREAR NIÑO USANDO EL SERVICE
-            const nuevoNino = await NinosService.create({
-                nombre: formData.nombre.trim(),
-                edad: formData.edad,
-                genero: formData.genero,
-                descripcion: formData.descripcion.trim(),
-                necesidades: formData.necesidades
-                    .split(",")
-                    .map((n) => n.trim())
-                    .filter((n) => n.length > 0),
-                estado_apadrinamiento: "Disponible",
-            });
+            const necesidades = formData.necesidades
+                .split(",")
+                .map((n) => n.trim())
+                .filter((n) => n.length > 0);
 
-            toast.success(`Niño ${nuevoNino.nombre} registrado exitosamente`);
+            if (isEditing && id) {
+                const ninoActualizado = await NinosService.update(id, {
+                    nombre: formData.nombre.trim(),
+                    edad: formData.edad,
+                    genero: formData.genero as "Masculino" | "Femenino",
+                    descripcion: formData.descripcion.trim(),
+                    necesidades,
+                    estado_apadrinamiento: formData.estado_apadrinamiento,
+                });
 
-            // Redirigir a la lista o al detalle del niño creado
-            navigate(`/ninos/${nuevoNino.id_nino}`);
+                toast.success(`Niño ${ninoActualizado.nombre} actualizado exitosamente`);
+                navigate(`/ninos/${ninoActualizado.id_nino || id}`);
+            } else {
+                const nuevoNino = await NinosService.create({
+                    nombre: formData.nombre.trim(),
+                    edad: formData.edad,
+                    genero: formData.genero as "Masculino" | "Femenino",
+                    descripcion: formData.descripcion.trim(),
+                    necesidades,
+                    estado_apadrinamiento: "Disponible",
+                });
+
+                toast.success(`Niño ${nuevoNino.nombre} registrado exitosamente`);
+                navigate(`/ninos/${nuevoNino.id_nino}`);
+            }
         } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : "Error al registrar niño";
+            const errorMsg =
+                err instanceof Error
+                    ? err.message
+                    : isEditing
+                        ? "Error al actualizar niño"
+                        : "Error al registrar niño";
             toast.error(errorMsg);
-            console.error("Error al crear niño:", err);
+            console.error(isEditing ? "Error al actualizar niño:" : "Error al crear niño:", err);
         } finally {
             setSubmitting(false);
         }
     };
+
+    if (loading) {
+        return (
+            <div className="space-y-6">
+                <Breadcrumbs />
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
             <Breadcrumbs />
 
             <div>
-                <h1 className="text-3xl font-bold text-foreground">Registrar Nuevo Niño</h1>
+                <h1 className="text-3xl font-bold text-foreground">
+                    {isEditing ? "Editar Niño" : "Registrar Nuevo Niño"}
+                </h1>
                 <p className="text-muted-foreground">
-                    Completa el formulario para agregar un nuevo beneficiario
+                    {isEditing
+                        ? "Modifica los datos del niño y guarda los cambios"
+                        : "Completa el formulario para agregar un nuevo beneficiario"}
                 </p>
             </div>
 
@@ -212,6 +280,8 @@ export default function NinoNuevoRefactored() {
                                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                         Guardando...
                                     </>
+                                ) : isEditing ? (
+                                    "Guardar Cambios"
                                 ) : (
                                     "Registrar Niño"
                                 )}
