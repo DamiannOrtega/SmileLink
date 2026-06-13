@@ -132,6 +132,14 @@ class NinoListSerializer(serializers.ModelSerializer):
         return descifrar_campo(obj.nombre_cifrado)
 
     def get_foto(self, obj):
+        fotos_dict = self.context.get('fotos_dict')
+        if fotos_dict is not None:
+            foto = fotos_dict.get(obj.pk, '')
+            if not foto:
+                nombre = descifrar_campo(obj.nombre_cifrado)
+                foto = generar_url_avatar(nombre)
+            return foto
+
         from .mongo_client import obtener_foto_nino
         from utils.avatars import generar_url_avatar
         try:

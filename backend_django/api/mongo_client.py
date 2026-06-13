@@ -212,3 +212,16 @@ def obtener_foto_nino(nino_id: int) -> str:
         return doc.get('foto_url', '')
     return ''
 
+
+def obtener_fotos_ninos(nino_ids: list) -> dict:
+    """
+    Obtiene las URLs de las fotos de varios niños desde MongoDB en una sola consulta.
+    Retorna un diccionario {nino_id: foto_url}.
+    """
+    if not nino_ids:
+        return {}
+    db = get_mongo_db()
+    cursor = db.ninos_fotos.find({'nino_id': {'$in': nino_ids}})
+    return {doc['nino_id']: doc.get('foto_url', '') for doc in cursor}
+
+

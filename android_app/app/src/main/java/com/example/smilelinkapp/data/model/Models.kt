@@ -6,7 +6,7 @@ import com.google.gson.annotations.SerializedName
  * Data model for a Child (Niño)
  */
 data class Nino(
-    @SerializedName("id_nino")
+    @SerializedName(value = "id_nino", alternate = ["id"])
     val idNino: String = "",
     
     @SerializedName("nombre")
@@ -38,7 +38,7 @@ data class Nino(
  * Data model for a Sponsor (Padrino)
  */
 data class Padrino(
-    @SerializedName("id_padrino")
+    @SerializedName(value = "id_padrino", alternate = ["id"])
     val idPadrino: String = "",
     
     @SerializedName("nombre")
@@ -70,7 +70,7 @@ data class Padrino(
  * Data model for Sponsorship (Apadrinamiento)
  */
 data class Apadrinamiento(
-    @SerializedName("id_apadrinamiento")
+    @SerializedName(value = "id_apadrinamiento", alternate = ["id"])
     val idApadrinamiento: String = "",
     
     @SerializedName("id_padrino")
@@ -99,7 +99,7 @@ data class Apadrinamiento(
  * Data model for Delivery (Entrega)
  */
 data class Entrega(
-    @SerializedName("id_entrega")
+    @SerializedName(value = "id_entrega", alternate = ["id"])
     val idEntrega: String = "",
     
     @SerializedName("id_apadrinamiento")
@@ -131,7 +131,7 @@ data class Entrega(
  * Data model for Delivery Point (Punto de Entrega)
  */
 data class PuntoEntrega(
-    @SerializedName("id_punto_entrega")
+    @SerializedName(value = "id_punto_entrega", alternate = ["id"])
     val idPuntoEntrega: String = "",
     
     @SerializedName("nombre_punto")
@@ -160,7 +160,7 @@ data class PuntoEntrega(
  * Data model for Gift Request (Solicitud de Regalo)
  */
 data class SolicitudRegalo(
-    @SerializedName("id_solicitud")
+    @SerializedName(value = "id_solicitud", alternate = ["id"])
     val idSolicitud: String = "",
     
     @SerializedName("id_nino")

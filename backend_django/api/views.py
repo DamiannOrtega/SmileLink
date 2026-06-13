@@ -56,7 +56,16 @@ class NinosViewSet(viewsets.ViewSet):
         qs = Nino.objects.filter(activo=True)
         if estado:
             qs = qs.filter(estado_apadrinamiento=estado)
-        serializer = NinoListSerializer(qs, many=True)
+
+        from .mongo_client import obtener_fotos_ninos
+        nino_ids = [n.pk for n in qs]
+        try:
+            fotos_dict = obtener_fotos_ninos(nino_ids)
+        except Exception as e:
+            logger.warning(f"No se pudieron pre-cargar las fotos de niños desde MongoDB: {e}")
+            fotos_dict = {}
+
+        serializer = NinoListSerializer(qs, many=True, context={'fotos_dict': fotos_dict})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -167,7 +176,16 @@ class NinosViewSet(viewsets.ViewSet):
     def disponibles(self, request):
         """GET /api/ninos/disponibles/ — niños listos para apadrinar."""
         ninos = Nino.objects.filter(estado_apadrinamiento='Disponible', activo=True)
-        serializer = NinoListSerializer(ninos, many=True)
+
+        from .mongo_client import obtener_fotos_ninos
+        nino_ids = [n.pk for n in ninos]
+        try:
+            fotos_dict = obtener_fotos_ninos(nino_ids)
+        except Exception as e:
+            logger.warning(f"No se pudieron pre-cargar las fotos de niños desde MongoDB: {e}")
+            fotos_dict = {}
+
+        serializer = NinoListSerializer(ninos, many=True, context={'fotos_dict': fotos_dict})
         return Response(serializer.data)
 
 
