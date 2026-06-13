@@ -137,7 +137,7 @@ export default function Entregas() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {entrega.evidencia_foto_path ? (
+                    {entrega.mongo_evidencia_id || entrega.evidencia_foto_path ? (
                       <Badge variant="default">✓ Foto</Badge>
                     ) : (
                       <Badge variant="outline">Sin foto</Badge>

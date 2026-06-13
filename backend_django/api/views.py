@@ -555,8 +555,10 @@ class EntregasViewSet(viewsets.ViewSet):
             descripcion_cifrada = descripcion_cifrada,
         )
 
-        # Guardar ObjectId de MongoDB en MySQL
+        # Guardar ObjectId de MongoDB en MySQL y marcar como Entregado
         entrega.mongo_evidencia_id = mongo_id
+        entrega.estado_entrega = 'Entregado'
+        entrega.fecha_entrega_real = datetime.now(timezone.utc).date()
         entrega.save()
 
         return Response({

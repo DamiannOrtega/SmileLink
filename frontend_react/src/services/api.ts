@@ -59,6 +59,7 @@ export interface Entrega {
   observaciones: string;
   id_punto_entrega: string; // FK to PuntoEntrega
   evidencia_foto_path?: string; // Path to encrypted image
+  mongo_evidencia_id?: string; // MongoDB evidence ID
   evidencias_nosql?: Array<{
     _id: string;
     tipo: string;
