@@ -113,8 +113,23 @@ private fun ChildDetailContent(
                     .fillMaxWidth()
                     .height(300.dp)
             ) {
+                val imageModel = remember(nino.foto, nino.nombre) {
+                    val foto = nino.foto
+                    if (foto != null && foto.startsWith("data:image/")) {
+                        try {
+                            val base64Data = foto.substringAfter("base64,")
+                            val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                            android.graphics.BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                        } catch (e: Exception) {
+                            "https://ui-avatars.com/api/?name=${nino.nombre}&size=512&background=7FD8BE&color=fff"
+                        }
+                    } else {
+                        foto ?: "https://ui-avatars.com/api/?name=${nino.nombre}&size=512&background=7FD8BE&color=fff"
+                    }
+                }
+
                 AsyncImage(
-                    model = "https://ui-avatars.com/api/?name=${nino.nombre}&size=512&background=7FD8BE&color=fff",
+                    model = imageModel,
                     contentDescription = "Foto de ${nino.nombre}",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop

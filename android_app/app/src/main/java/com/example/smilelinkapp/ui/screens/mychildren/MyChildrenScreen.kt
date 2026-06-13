@@ -110,8 +110,23 @@ private fun SponsoredChildCard(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val imageModel = remember(childInfo.nino.foto, childInfo.nino.nombre) {
+                    val foto = childInfo.nino.foto
+                    if (foto != null && foto.startsWith("data:image/")) {
+                        try {
+                            val base64Data = foto.substringAfter("base64,")
+                            val decodedBytes = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT)
+                            android.graphics.BitmapFactory.decodeByteArray(decodedBytes, 0, decodedBytes.size)
+                        } catch (e: Exception) {
+                            "https://ui-avatars.com/api/?name=${childInfo.nino.nombre}&size=128&background=7FD8BE&color=fff"
+                        }
+                    } else {
+                        foto ?: "https://ui-avatars.com/api/?name=${childInfo.nino.nombre}&size=128&background=7FD8BE&color=fff"
+                    }
+                }
+
                 AsyncImage(
-                    model = "https://ui-avatars.com/api/?name=${childInfo.nino.nombre}&size=128&background=7FD8BE&color=fff",
+                    model = imageModel,
                     contentDescription = "Foto de ${childInfo.nino.nombre}",
                     modifier = Modifier
                         .size(64.dp)

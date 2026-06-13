@@ -215,6 +215,29 @@ class SmileLinkRepository {
         }
     }
     
+    suspend fun uploadEvidencia(
+        id: String,
+        archivo: okhttp3.MultipartBody.Part,
+        subidoPor: okhttp3.RequestBody? = null,
+        descripcion: okhttp3.RequestBody? = null
+    ): Result<Map<String, String>> {
+        return if (AppConfig.USE_MOCK) {
+            delay(500)
+            Result.success(mapOf("mensaje" to "Evidencia guardada (mock)"))
+        } else {
+            try {
+                val response = apiService.uploadEvidencia(id, archivo, subidoPor, descripcion)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else {
+                    Result.failure(Exception("Error: ${response.code()}"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+    
     // ===== PUNTOS DE ENTREGA (Delivery Points) =====
     
     suspend fun getPuntosEntrega(): Result<List<PuntoEntrega>> {
