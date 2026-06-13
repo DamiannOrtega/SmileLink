@@ -1080,6 +1080,18 @@ export interface DashboardKPIs {
   solicitudes_abiertas: number;
 }
 
+export interface NoSQLStats {
+  documentos_totales: {
+    evidencias: number;
+    bitacora_eventos: number;
+    cartas: number;
+    historial_notificaciones: number;
+  };
+  eventos_por_tabla: Array<{ tabla: string; cantidad: number }>;
+  eventos_por_accion: Array<{ accion: string; cantidad: number }>;
+  evidencias_por_tipo: Array<{ tipo: string; cantidad: number }>;
+}
+
 export const DashboardService = {
   async getKPIs(): Promise<DashboardKPIs> {
     if (USE_MOCK) {
@@ -1089,7 +1101,7 @@ export const DashboardService = {
         ninos_disponibles: MOCK_NINOS.filter((n) => n.estado_apadrinamiento === "Disponible").length,
         ninos_apadrinados: MOCK_NINOS.filter((n) => n.estado_apadrinamiento === "Apadrinado").length,
         total_padrinos: MOCK_PADRINOS.length,
-        padrinos_activos: MOCK_PADRINOS.length, // En mock todos están activos
+        padrinos_activos: MOCK_PADRINOS.length,
         apadrinamientos_activos: MOCK_APADRINAMIENTOS.filter(
           (a) => a.estado_apadrinamiento_registro === "Activo"
         ).length,
@@ -1102,4 +1114,34 @@ export const DashboardService = {
     }
     return fetchAPI<DashboardKPIs>("/dashboard/kpis/");
   },
+
+  async getNoSQLStats(): Promise<NoSQLStats> {
+    if (USE_MOCK) {
+      await delay();
+      return {
+        documentos_totales: {
+          evidencias: MOCK_ENTREGAS.length,
+          bitacora_eventos: 15,
+          cartas: 5,
+          historial_notificaciones: 8
+        },
+        eventos_por_tabla: [
+          { tabla: "api_nino", cantidad: 12 },
+          { tabla: "api_padrino", cantidad: 6 },
+          { tabla: "api_apadrinamiento", cantidad: 8 }
+        ],
+        eventos_por_accion: [
+          { accion: "CREATE", cantidad: 18 },
+          { accion: "UPDATE", cantidad: 8 }
+        ],
+        evidencias_por_tipo: [
+          { tipo: "foto", cantidad: 8 },
+          { tipo: "video", cantidad: 2 }
+        ]
+      };
+    }
+    return fetchAPI<NoSQLStats>("/dashboard/nosql-stats/");
+  }
 };
+
+

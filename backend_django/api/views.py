@@ -773,3 +773,73 @@ class DashboardViewSet(viewsets.ViewSet):
         }
         serializer = DashboardKPIsSerializer(kpis)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def nosql_stats(self, request):
+        """GET /api/dashboard/nosql-stats/ — agregaciones y métricas de MongoDB (NoSQL)"""
+        from .mongo_client import get_mongo_db
+        try:
+            db = get_mongo_db()
+            
+            # Conteo de documentos por colección
+            counts = {
+                'evidencias': db.evidencias.count_documents({}),
+                'bitacora_eventos': db.bitacora_eventos.count_documents({}),
+                'cartas': db.cartas.count_documents({}),
+                'historial_notificaciones': db.historial_notificaciones.count_documents({}),
+            }
+            
+            # Agregación: Eventos por Tabla en la bitácora
+            pipeline_eventos_tabla = [
+                {"$group": {"_id": "$tabla", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1}}
+            ]
+            eventos_tabla = list(db.bitacora_eventos.aggregate(pipeline_eventos_tabla))
+            eventos_tabla_res = [{"tabla": item["_id"] or "General", "cantidad": item["count"]} for item in eventos_tabla]
+            
+            # Agregación: Eventos por Acción en la bitácora
+            pipeline_eventos_accion = [
+                {"$group": {"_id": "$accion", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1}}
+            ]
+            eventos_accion = list(db.bitacora_eventos.aggregate(pipeline_eventos_accion))
+            eventos_accion_res = [{"accion": item["_id"], "cantidad": item["count"]} for item in eventos_accion]
+
+            # Agregación: Evidencias por Tipo (foto, video, etc.)
+            pipeline_evidencias_tipo = [
+                {"$group": {"_id": "$tipo", "count": {"$sum": 1}}},
+                {"$sort": {"count": -1}}
+            ]
+            evidencias_tipo = list(db.evidencias.aggregate(pipeline_evidencias_tipo))
+            evidencias_tipo_res = [{"tipo": item["_id"], "cantidad": item["count"]} for item in evidencias_tipo]
+            
+            # Si no hay datos, inicializamos con algunos mocks para ver gráficas si la base de datos está vacía
+            if counts['bitacora_eventos'] == 0:
+                eventos_tabla_res = [
+                    {"tabla": "api_nino", "cantidad": 15},
+                    {"tabla": "api_padrino", "cantidad": 8},
+                    {"tabla": "api_apadrinamiento", "cantidad": 10},
+                    {"tabla": "api_entrega", "cantidad": 5}
+                ]
+                eventos_accion_res = [
+                    {"accion": "CREATE", "cantidad": 20},
+                    {"accion": "UPDATE", "cantidad": 12},
+                    {"accion": "LOGIN", "cantidad": 6}
+                ]
+            if counts['evidencias'] == 0:
+                evidencias_tipo_res = [
+                    {"tipo": "foto", "cantidad": 12},
+                    {"tipo": "video", "cantidad": 3},
+                    {"tipo": "documento", "cantidad": 2}
+                ]
+
+            return Response({
+                'documentos_totales': counts,
+                'eventos_por_tabla': eventos_tabla_res,
+                'eventos_por_accion': eventos_accion_res,
+                'evidencias_por_tipo': evidencias_tipo_res,
+            })
+        except Exception as e:
+            logger.error(f"Error al obtener métricas NoSQL: {e}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

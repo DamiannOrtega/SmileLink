@@ -21,7 +21,7 @@ object AppConfig {
         get() = if (isEmulator()) {
             "http://10.0.2.2:8000/api/"  // Emulator
         } else {
-            "http://192.168.1.87:8000/api/"  // Physical device (your PC's IP)
+            "http://10.66.207.165:8000/api/"  // Physical device (central server IP)
         }
     
     /**
