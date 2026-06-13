@@ -8,7 +8,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { PuntosEntregaService, PuntoEntrega } from "@/services/api";
-import GoogleMapComponent from "@/components/GoogleMapComponent";
+import LocationMapPicker from "@/components/LocationMapPicker";
 
 export default function UbicacionDetalle() {
   const navigate = useNavigate();
@@ -161,10 +161,11 @@ export default function UbicacionDetalle() {
         </div>
 
         <div>
-          <GoogleMapComponent
+          <LocationMapPicker
             lat={Number(ubicacion.latitud)}
             lng={Number(ubicacion.longitud)}
-            title={ubicacion.nombre_punto}
+            onLocationChange={() => {}}
+            readOnly
           />
         </div>
       </div>

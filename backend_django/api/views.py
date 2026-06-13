@@ -657,8 +657,11 @@ class PuntosEntregaViewSet(viewsets.ViewSet):
     """ViewSet para Puntos de Entrega."""
 
     def list(self, request):
-        puntos = PuntoEntrega.objects.filter(estado_punto='Activo')
-        return Response(PuntoEntregaSerializer(puntos, many=True).data)
+        qs = PuntoEntrega.objects.all().order_by('-id')
+        activo = request.query_params.get('activo')
+        if activo == 'true':
+            qs = qs.filter(estado_punto='Activo')
+        return Response(PuntoEntregaSerializer(qs, many=True).data)
 
     def retrieve(self, request, pk=None):
         try:

@@ -79,13 +79,22 @@ export default function CartaNueva() {
   const onSubmit = async (data: FormValues) => {
     try {
       if (isEditing && id) {
-        await SolicitudesService.update(id, data);
+        const actualizada = await SolicitudesService.update(id, {
+          descripcion_solicitud: data.descripcion_solicitud,
+          estado_solicitud: data.estado_solicitud,
+        });
         toast.success("Solicitud actualizada exitosamente");
+        navigate(`/cartas/${actualizada.id_solicitud || id}`);
       } else {
-        await SolicitudesService.create(data);
+        const nueva = await SolicitudesService.create({
+          id_nino: data.id_nino,
+          descripcion_solicitud: data.descripcion_solicitud,
+          estado_solicitud: data.estado_solicitud,
+          fecha_solicitud: new Date().toISOString().split("T")[0],
+        });
         toast.success("Solicitud registrada exitosamente");
+        navigate(`/cartas/${nueva.id_solicitud}`);
       }
-      navigate("/cartas");
     } catch (err) {
       toast.error("Error al guardar la solicitud");
     }

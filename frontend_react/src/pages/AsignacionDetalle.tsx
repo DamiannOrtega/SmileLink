@@ -242,7 +242,9 @@ export default function AsignacionDetalle() {
         <CardContent className="flex gap-4">
           {asignacion.estado_apadrinamiento_registro === "Activo" && (
             <>
-              <Button onClick={() => toast.success("Entrega de regalo iniciada")}>
+              <Button
+                onClick={() => navigate(`/entregas/nueva?apadrinamiento=${id}`)}
+              >
                 Registrar Entrega de Regalo
               </Button>
               <Button
