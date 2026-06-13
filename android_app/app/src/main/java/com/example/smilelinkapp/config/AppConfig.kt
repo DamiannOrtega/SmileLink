@@ -18,11 +18,7 @@ object AppConfig {
      * Automatically detects if running on emulator or physical device
      */
     val BASE_URL: String
-        get() = if (isEmulator()) {
-            "http://10.0.2.2:8000/api/"  // Emulator
-        } else {
-            "http://10.66.207.165:8000/api/"  // Physical device (central server IP)
-        }
+        get() = "http://10.66.207.165:8000/api/"
     
     /**
      * Enable network logging for debugging
