@@ -81,9 +81,12 @@ export default function Cartas() {
     <div className="space-y-6">
       <Breadcrumbs />
 
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Solicitudes de Regalo</h1>
-        <p className="text-muted-foreground">Administra las solicitudes de los niños</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Solicitudes de Regalo</h1>
+          <p className="text-muted-foreground">Administra las solicitudes de los niños</p>
+        </div>
+        <Button onClick={() => navigate("/cartas/nueva")}>Nueva Carta</Button>
       </div>
 
       <Card>

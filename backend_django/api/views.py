@@ -617,6 +617,19 @@ class SolicitudesViewSet(viewsets.ViewSet):
         sol.mongo_log_id = mongo_id
         sol.save()
 
+        # Guardar en la colección 'cartas' de MongoDB (cifrada)
+        try:
+            ap = nino.apadrinamientos.filter(estado_apadrinamiento_registro='Activo').first()
+            ap_id = ap.pk if ap else 0
+            guardar_carta(
+                nino_id=nino.pk,
+                apadrinamiento_id=ap_id,
+                contenido_cifrado=cifrar_campo(data.get('descripcion_solicitud', '')),
+                remitente="Administrador"
+            )
+        except Exception as mongo_err:
+            logger.error(f"No se pudo guardar la carta en MongoDB: {mongo_err}")
+
         return Response({'id': sol.pk, 'mensaje': 'Solicitud creada correctamente'},
                         status=status.HTTP_201_CREATED)
 
