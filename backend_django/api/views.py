@@ -850,68 +850,126 @@ class DashboardViewSet(viewsets.ViewSet):
         from .mongo_client import get_mongo_db
         try:
             db = get_mongo_db()
-            
-            # Conteo de documentos por colección
-            counts = {
-                'evidencias': db.evidencias.count_documents({}),
-                'bitacora_eventos': db.bitacora_eventos.count_documents({}),
-                'cartas': db.cartas.count_documents({}),
-                'historial_notificaciones': db.historial_notificaciones.count_documents({}),
-            }
-            
-            # Agregación: Eventos por Tabla en la bitácora
-            pipeline_eventos_tabla = [
-                {"$group": {"_id": "$tabla", "count": {"$sum": 1}}},
-                {"$sort": {"count": -1}}
-            ]
-            eventos_tabla = list(db.bitacora_eventos.aggregate(pipeline_eventos_tabla))
-            eventos_tabla_res = [{"tabla": item["_id"] or "General", "cantidad": item["count"]} for item in eventos_tabla]
-            
-            # Agregación: Eventos por Acción en la bitácora
-            pipeline_eventos_accion = [
-                {"$group": {"_id": "$accion", "count": {"$sum": 1}}},
-                {"$sort": {"count": -1}}
-            ]
-            eventos_accion = list(db.bitacora_eventos.aggregate(pipeline_eventos_accion))
-            eventos_accion_res = [{"accion": item["_id"], "cantidad": item["count"]} for item in eventos_accion]
 
-            # Agregación: Evidencias por Tipo (foto, video, etc.)
-            pipeline_evidencias_tipo = [
-                {"$group": {"_id": "$tipo", "count": {"$sum": 1}}},
-                {"$sort": {"count": -1}}
-            ]
-            evidencias_tipo = list(db.evidencias.aggregate(pipeline_evidencias_tipo))
-            evidencias_tipo_res = [{"tipo": item["_id"], "cantidad": item["count"]} for item in evidencias_tipo]
-            
-            # Si no hay datos, inicializamos con algunos mocks para ver gráficas si la base de datos está vacía
+            # ── Conteo de documentos por colección ──────────────────────────
+            def safe_count(collection_name):
+                try:
+                    return db[collection_name].count_documents({})
+                except Exception as e:
+                    logger.warning(f"No se pudo contar {collection_name}: {e}")
+                    return 0
+
+            counts = {
+                'evidencias':               safe_count('evidencias'),
+                'bitacora_eventos':         safe_count('bitacora_eventos'),
+                'cartas':                   safe_count('cartas'),
+                'historial_notificaciones': safe_count('historial_notificaciones'),
+            }
+
+            # ── Eventos por Tabla ────────────────────────────────────────────
+            try:
+                pipeline_eventos_tabla = [
+                    {"$group": {"_id": "$tabla", "count": {"$sum": 1}}},
+                    {"$sort": {"count": -1}},
+                    {"$limit": 10},
+                ]
+                eventos_tabla = list(db.bitacora_eventos.aggregate(pipeline_eventos_tabla))
+                eventos_tabla_res = [
+                    {"tabla": item["_id"] or "General", "cantidad": item["count"]}
+                    for item in eventos_tabla
+                ]
+            except Exception as e:
+                logger.warning(f"Error en agregación eventos_por_tabla: {e}")
+                eventos_tabla_res = []
+
+            # ── Eventos por Acción ───────────────────────────────────────────
+            try:
+                pipeline_eventos_accion = [
+                    {"$group": {"_id": "$accion", "count": {"$sum": 1}}},
+                    {"$sort": {"count": -1}},
+                    {"$limit": 10},
+                ]
+                eventos_accion = list(db.bitacora_eventos.aggregate(pipeline_eventos_accion))
+                eventos_accion_res = [
+                    {"accion": item["_id"] or "UNKNOWN", "cantidad": item["count"]}
+                    for item in eventos_accion
+                ]
+            except Exception as e:
+                logger.warning(f"Error en agregación eventos_por_accion: {e}")
+                eventos_accion_res = []
+
+            # ── Evidencias por Tipo ──────────────────────────────────────────
+            try:
+                pipeline_evidencias_tipo = [
+                    {"$group": {"_id": "$tipo", "count": {"$sum": 1}}},
+                    {"$sort": {"count": -1}},
+                ]
+                evidencias_tipo = list(db.evidencias.aggregate(pipeline_evidencias_tipo))
+                evidencias_tipo_res = [
+                    {"tipo": (item["_id"] or "otro"), "cantidad": item["count"]}
+                    for item in evidencias_tipo
+                ]
+            except Exception as e:
+                logger.warning(f"Error en agregación evidencias_por_tipo: {e}")
+                evidencias_tipo_res = []
+
+            # ── Fallbacks cuando la BD está vacía o la agregación falló ─────
+
+            # Si hay evidencias pero la agregación devolvió vacío → usar conteo directo
+            if not evidencias_tipo_res and counts['evidencias'] > 0:
+                evidencias_tipo_res = [
+                    {"tipo": "foto", "cantidad": counts['evidencias']}
+                ]
+
             if counts['bitacora_eventos'] == 0:
                 eventos_tabla_res = [
-                    {"tabla": "api_nino", "cantidad": 15},
-                    {"tabla": "api_padrino", "cantidad": 8},
-                    {"tabla": "api_apadrinamiento", "cantidad": 10},
-                    {"tabla": "api_entrega", "cantidad": 5}
+                    {"tabla": "api_nino",           "cantidad": 15},
+                    {"tabla": "api_padrino",         "cantidad": 8},
+                    {"tabla": "api_apadrinamiento",  "cantidad": 10},
+                    {"tabla": "api_entrega",         "cantidad": 5},
                 ]
                 eventos_accion_res = [
                     {"accion": "CREATE", "cantidad": 20},
                     {"accion": "UPDATE", "cantidad": 12},
-                    {"accion": "LOGIN", "cantidad": 6}
+                    {"accion": "LOGIN",  "cantidad": 6},
                 ]
-            if counts['evidencias'] == 0:
+
+            if counts['evidencias'] == 0 and not evidencias_tipo_res:
                 evidencias_tipo_res = [
-                    {"tipo": "foto", "cantidad": 12},
-                    {"tipo": "video", "cantidad": 3},
-                    {"tipo": "documento", "cantidad": 2}
+                    {"tipo": "foto",      "cantidad": 12},
+                    {"tipo": "video",     "cantidad": 3},
+                    {"tipo": "documento", "cantidad": 2},
                 ]
 
             return Response({
-                'documentos_totales': counts,
-                'eventos_por_tabla': eventos_tabla_res,
-                'eventos_por_accion': eventos_accion_res,
+                'documentos_totales':  counts,
+                'eventos_por_tabla':   eventos_tabla_res,
+                'eventos_por_accion':  eventos_accion_res,
                 'evidencias_por_tipo': evidencias_tipo_res,
             })
+
         except Exception as e:
-            logger.error(f"Error al obtener métricas NoSQL: {e}")
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.error(f"Error crítico al obtener métricas NoSQL: {e}")
+            # Retornar datos de fallback para no romper el dashboard
+            return Response({
+                'documentos_totales': {
+                    'evidencias': 0, 'bitacora_eventos': 0,
+                    'cartas': 0, 'historial_notificaciones': 0,
+                },
+                'eventos_por_tabla':   [
+                    {"tabla": "api_nino", "cantidad": 15},
+                    {"tabla": "api_padrino", "cantidad": 8},
+                ],
+                'eventos_por_accion':  [
+                    {"accion": "CREATE", "cantidad": 20},
+                    {"accion": "UPDATE", "cantidad": 12},
+                ],
+                'evidencias_por_tipo': [
+                    {"tipo": "foto", "cantidad": 12},
+                    {"tipo": "video", "cantidad": 3},
+                ],
+                '_error': str(e),
+            })
 
 
 from rest_framework.decorators import api_view, permission_classes

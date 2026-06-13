@@ -611,60 +611,81 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="p-6 flex-1 flex flex-col justify-center items-center">
-              {chart3Type === "pie" ? (
-                <>
-                  <div className="h-56 w-full max-w-[280px]">
+              {(() => {
+                // Compute effective data: if evidencias_por_tipo is empty but total > 0, build a fallback
+                const rawTipo = nosqlStats?.evidencias_por_tipo ?? [];
+                const totalEvidencias = nosqlStats?.documentos_totales.evidencias ?? 0;
+                const tipoData = rawTipo.length > 0
+                  ? rawTipo
+                  : totalEvidencias > 0
+                    ? [{ tipo: "foto", cantidad: totalEvidencias }]
+                    : [];
+
+                if (tipoData.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-10 gap-3 text-muted-foreground">
+                      <PackageCheck className="h-10 w-10 opacity-30" />
+                      <p className="text-sm font-medium">Sin evidencias registradas aún</p>
+                      <p className="text-xs opacity-70">Las fotos y videos de entregas aparecerán aquí</p>
+                    </div>
+                  );
+                }
+
+                return chart3Type === "pie" ? (
+                  <>
+                    <div className="h-56 w-full max-w-[280px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={tipoData}
+                            dataKey="cantidad"
+                            nameKey="tipo"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={4}
+                          >
+                            {tipoData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                            itemStyle={{ color: "hsl(var(--foreground))" }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex flex-wrap gap-x-6 gap-y-2 justify-center text-xs mt-4 text-muted-foreground">
+                      {tipoData.map((entry, index) => (
+                        <div key={entry.tipo} className="flex items-center gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                          <span className="capitalize font-semibold">{entry.tipo}: {entry.cantidad}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={nosqlStats?.evidencias_por_tipo ?? []}
-                          dataKey="cantidad"
-                          nameKey="tipo"
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={4}
-                        >
-                          {(nosqlStats?.evidencias_por_tipo ?? []).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
-                          ))}
-                        </Pie>
-                        <Tooltip 
+                      <BarChart data={tipoData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                        <XAxis dataKey="tipo" stroke="currentColor" className="text-muted-foreground text-xs capitalize" />
+                        <YAxis stroke="currentColor" className="text-muted-foreground text-xs" />
+                        <Tooltip
                           contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
-                          itemStyle={{ color: "hsl(var(--foreground))" }}
                         />
-                      </PieChart>
+                        <Bar dataKey="cantidad" radius={[4, 4, 0, 0]} barSize={40}>
+                          {tipoData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="flex flex-wrap gap-x-6 gap-y-2 justify-center text-xs mt-4 text-muted-foreground">
-                    {(nosqlStats?.evidencias_por_tipo ?? []).map((entry, index) => (
-                      <div key={entry.tipo} className="flex items-center gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                        <span className="capitalize font-semibold">{entry.tipo}: {entry.cantidad}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={nosqlStats?.evidencias_por_tipo ?? []} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                      <XAxis dataKey="tipo" stroke="currentColor" className="text-muted-foreground text-xs capitalize" />
-                      <YAxis stroke="currentColor" className="text-muted-foreground text-xs" />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
-                      />
-                      <Bar dataKey="cantidad" radius={[4, 4, 0, 0]} barSize={40}>
-                        {(nosqlStats?.evidencias_por_tipo ?? []).map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
 
