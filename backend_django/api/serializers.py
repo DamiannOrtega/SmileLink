@@ -270,3 +270,4 @@ class DashboardKPIsSerializer(serializers.Serializer):
     total_entregas           = serializers.IntegerField()
     entregas_completadas     = serializers.IntegerField()
     entregas_pendientes      = serializers.IntegerField()
+    solicitudes_abiertas     = serializers.IntegerField(default=0)

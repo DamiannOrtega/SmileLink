@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.smilelinkapp.data.model.Entrega
-import coil.compose.AsyncImage
 import com.example.smilelinkapp.ui.components.EmptyState
 import com.example.smilelinkapp.ui.components.ErrorMessage
 import com.example.smilelinkapp.ui.components.LoadingIndicator
@@ -28,6 +27,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.smilelinkapp.ui.theme.SuccessGreen
 import com.example.smilelinkapp.ui.theme.WarningOrange
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,6 +39,15 @@ fun MyChildrenScreen(
     val context = LocalContext.current
     var selectedDeliveryId by remember { mutableStateOf<String?>(null) }
     var isUploading by remember { mutableStateOf(false) }
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    // Stop refresh indicator once state changes from Loading
+    LaunchedEffect(uiState) {
+        if (uiState !is MyChildrenUiState.Loading) {
+            isRefreshing = false
+        }
+    }
+
     
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -97,45 +106,54 @@ fun MyChildrenScreen(
             )
         }
     ) { paddingValues ->
-        when (val state = uiState) {
-            is MyChildrenUiState.Loading -> {
-                LoadingIndicator()
-            }
-            
-            is MyChildrenUiState.Success -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    items(state.children) { childInfo ->
-                        SponsoredChildCard(
-                            childInfo = childInfo,
-                            onClick = { onChildClick(childInfo.nino.idNino) },
-                            onUploadEvidence = { entrega ->
-                                selectedDeliveryId = entrega.idEntrega
-                                launcher.launch("image/*")
-                            }
-                        )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                isRefreshing = true
+                viewModel.loadSponsoredChildren()
+            },
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            when (val state = uiState) {
+                is MyChildrenUiState.Loading -> {
+                    LoadingIndicator()
+                }
+                
+                is MyChildrenUiState.Success -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(state.children) { childInfo ->
+                            SponsoredChildCard(
+                                childInfo = childInfo,
+                                onClick = { onChildClick(childInfo.nino.idNino) },
+                                onUploadEvidence = { entrega ->
+                                    selectedDeliveryId = entrega.idEntrega
+                                    launcher.launch("image/*")
+                                }
+                            )
+                        }
                     }
                 }
-            }
-            
-            is MyChildrenUiState.Empty -> {
-                EmptyState(
-                    title = "No tienes ahijados aún",
-                    message = "Explora niños disponibles y comienza a apadrinar",
-                    emoji = "💝"
-                )
-            }
-            
-            is MyChildrenUiState.Error -> {
-                ErrorMessage(
-                    message = state.message,
-                    onRetry = { viewModel.loadSponsoredChildren() }
-                )
+                
+                is MyChildrenUiState.Empty -> {
+                    EmptyState(
+                        title = "No tienes ahijados aún",
+                        message = "Explora niños disponibles y comienza a apadrinar",
+                        emoji = "💝"
+                    )
+                }
+                
+                is MyChildrenUiState.Error -> {
+                    ErrorMessage(
+                        message = state.message,
+                        onRetry = { viewModel.loadSponsoredChildren() }
+                    )
+                }
             }
         }
     }

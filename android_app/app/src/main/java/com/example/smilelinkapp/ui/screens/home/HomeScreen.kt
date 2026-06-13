@@ -23,15 +23,23 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    
+    var isRefreshing by remember { mutableStateOf(false) }
+
+    // Stop refresh indicator once state changes from Loading
+    LaunchedEffect(uiState) {
+        if (uiState !is HomeUiState.Loading) {
+            isRefreshing = false
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         "Descubre Niños",
                         style = MaterialTheme.typography.headlineSmall
-                    ) 
+                    )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
@@ -62,13 +70,13 @@ fun HomeScreen(
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium
             )
-            
+
             // Filters Row
             val genderFilter by viewModel.genderFilter.collectAsState()
             val sortBy by viewModel.sortBy.collectAsState()
             var genderMenuExpanded by remember { mutableStateOf(false) }
             var sortMenuExpanded by remember { mutableStateOf(false) }
-            
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -124,42 +132,52 @@ fun HomeScreen(
                     }
                 }
             }
-            
-            // Content
-            when (val state = uiState) {
-                is HomeUiState.Loading -> {
-                    LoadingIndicator()
-                }
-                
-                is HomeUiState.Success -> {
-                    val filteredNinos = viewModel.getFilteredChildren(state.ninos)
-                    
-                    if (filteredNinos.isEmpty()) {
-                        EmptyState(
-                            title = "No se encontraron niños",
-                            message = "Intenta con otra búsqueda",
-                            emoji = "🔍"
-                        )
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(filteredNinos) { nino ->
-                                ChildCard(
-                                    nino = nino,
-                                    onClick = { onChildClick(nino.idNino) }
-                                )
+
+            // Content with Pull-to-Refresh
+            PullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    isRefreshing = true
+                    viewModel.loadAvailableChildren()
+                },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                when (val state = uiState) {
+                    is HomeUiState.Loading -> {
+                        LoadingIndicator()
+                    }
+
+                    is HomeUiState.Success -> {
+                        val filteredNinos = viewModel.getFilteredChildren(state.ninos)
+
+                        if (filteredNinos.isEmpty()) {
+                            EmptyState(
+                                title = "No se encontraron niños",
+                                message = "Intenta con otra búsqueda",
+                                emoji = "🔍"
+                            )
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(filteredNinos) { nino ->
+                                    ChildCard(
+                                        nino = nino,
+                                        onClick = { onChildClick(nino.idNino) }
+                                    )
+                                }
                             }
                         }
                     }
-                }
-                
-                is HomeUiState.Error -> {
-                    ErrorMessage(
-                        message = state.message,
-                        onRetry = { viewModel.loadAvailableChildren() }
-                    )
+
+                    is HomeUiState.Error -> {
+                        ErrorMessage(
+                            message = state.message,
+                            onRetry = { viewModel.loadAvailableChildren() }
+                        )
+                    }
                 }
             }
         }

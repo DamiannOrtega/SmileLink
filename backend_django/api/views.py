@@ -839,6 +839,7 @@ class DashboardViewSet(viewsets.ViewSet):
             'total_entregas':          Entrega.objects.count(),
             'entregas_completadas':    Entrega.objects.filter(estado_entrega='Entregado').count(),
             'entregas_pendientes':     Entrega.objects.filter(estado_entrega='Pendiente').count(),
+            'solicitudes_abiertas':    Solicitud.objects.filter(estado_solicitud='Abierta').count(),
         }
         serializer = DashboardKPIsSerializer(kpis)
         return Response(serializer.data)
