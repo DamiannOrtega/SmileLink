@@ -298,6 +298,9 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
         estado = request.query_params.get('estado')
         if estado:
             qs = qs.filter(estado_apadrinamiento_registro=estado)
+        padrino_id = request.query_params.get('padrino_id')
+        if padrino_id:
+            qs = qs.filter(id_padrino_id=padrino_id)
         serializer = ApadrinamientoSerializer(qs, many=True)
         return Response(serializer.data)
 
@@ -398,6 +401,9 @@ class EntregasViewSet(viewsets.ViewSet):
         estado = request.query_params.get('estado')
         if estado:
             qs = qs.filter(estado_entrega=estado)
+        apadrinamiento_id = request.query_params.get('apadrinamiento_id')
+        if apadrinamiento_id:
+            qs = qs.filter(id_apadrinamiento_id=apadrinamiento_id)
         serializer = EntregaSerializer(qs, many=True)
         return Response(serializer.data)
 

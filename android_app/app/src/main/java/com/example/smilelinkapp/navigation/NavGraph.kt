@@ -1,6 +1,7 @@
 package com.example.smilelinkapp.navigation
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -21,11 +22,13 @@ import com.example.smilelinkapp.ui.screens.profile.ProfileScreen
 @Composable
 fun SmileLinkNavGraph(
     navController: NavHostController,
-    startDestination: String
+    startDestination: String,
+    modifier: Modifier = Modifier
 ) {
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        modifier = modifier
     ) {
         // Login
         composable(Screen.Login.route) {

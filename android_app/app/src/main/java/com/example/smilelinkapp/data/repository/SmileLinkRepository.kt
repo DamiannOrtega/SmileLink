@@ -127,10 +127,9 @@ class SmileLinkRepository {
             Result.success(MockDataProvider.getApadrinamientosForPadrino(padrinoId))
         } else {
             try {
-                val response = apiService.getApadrinamientos()
+                val response = apiService.getApadrinamientos(padrinoId)
                 if (response.isSuccessful && response.body() != null) {
-                    val filtered = response.body()!!.filter { it.idPadrino == padrinoId }
-                    Result.success(filtered)
+                    Result.success(response.body()!!)
                 } else {
                     Result.failure(Exception("Error: ${response.code()}"))
                 }
@@ -166,10 +165,9 @@ class SmileLinkRepository {
             Result.success(MockDataProvider.getEntregasForApadrinamiento(apadrinamientoId))
         } else {
             try {
-                val response = apiService.getEntregas()
+                val response = apiService.getEntregas(apadrinamientoId)
                 if (response.isSuccessful && response.body() != null) {
-                    val filtered = response.body()!!.filter { it.idApadrinamiento == apadrinamientoId }
-                    Result.success(filtered)
+                    Result.success(response.body()!!)
                 } else {
                     Result.failure(Exception("Error: ${response.code()}"))
                 }

@@ -37,7 +37,9 @@ interface SmileLinkApiService {
     
     // ===== APADRINAMIENTOS (Sponsorships) =====
     @GET("apadrinamientos/")
-    suspend fun getApadrinamientos(): Response<List<Apadrinamiento>>
+    suspend fun getApadrinamientos(
+        @Query("padrino_id") padrinoId: String? = null
+    ): Response<List<Apadrinamiento>>
     
     @GET("apadrinamientos/{id}/")
     suspend fun getApadrinamiento(@Path("id") id: String): Response<Apadrinamiento>
@@ -50,7 +52,9 @@ interface SmileLinkApiService {
     
     // ===== ENTREGAS (Deliveries) =====
     @GET("entregas/")
-    suspend fun getEntregas(): Response<List<Entrega>>
+    suspend fun getEntregas(
+        @Query("apadrinamiento_id") apadrinamientoId: String? = null
+    ): Response<List<Entrega>>
     
     @GET("entregas/{id}/")
     suspend fun getEntrega(@Path("id") id: String): Response<Entrega>

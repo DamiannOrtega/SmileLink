@@ -1,6 +1,8 @@
 package com.example.smilelinkapp.ui.screens.map
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -10,12 +12,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smilelinkapp.data.model.PuntoEntrega
 import com.example.smilelinkapp.ui.components.ErrorMessage
 import com.example.smilelinkapp.ui.components.LoadingIndicator
 import com.example.smilelinkapp.ui.theme.OceanBlue
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.MarkerState
+import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,13 +61,11 @@ fun MapScreen(
                 }
                 
                 is MapUiState.Success -> {
-                    // Map placeholder (Google Maps would go here)
-                    MapPlaceholder(
+                    MapContent(
                         deliveryPoints = state.deliveryPoints,
                         onPointClick = { viewModel.selectPoint(it) }
                     )
                     
-                    // Bottom sheet with selected point details
                     selectedPoint?.let { point ->
                         DeliveryPointBottomSheet(
                             point = point,
@@ -79,60 +86,52 @@ fun MapScreen(
 }
 
 @Composable
-private fun MapPlaceholder(
+private fun MapContent(
     deliveryPoints: List<PuntoEntrega>,
     onPointClick: (PuntoEntrega) -> Unit
 ) {
-    // This is a placeholder. In production, you would use Google Maps Compose here
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+    val Aguascalientes = LatLng(21.8853, -102.2916)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(Aguascalientes, 12f)
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            shape = MaterialTheme.shapes.medium,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
+        item {
+            GoogleMap(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .clip(MaterialTheme.shapes.medium),
+                cameraPositionState = cameraPositionState
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Mapa de Google Maps",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Integración pendiente",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                deliveryPoints.forEach { point ->
+                    Marker(
+                        state = remember { MarkerState(position = LatLng(point.latitud, point.longitud)) },
+                        title = point.nombrePunto,
+                        snippet = point.direccionFisica,
+                        onClick = {
+                            onPointClick(point)
+                            true
+                        }
                     )
                 }
             }
         }
         
-        Text(
-            text = "Puntos de Entrega Disponibles",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        item {
+            Text(
+                text = "Puntos de Entrega Disponibles",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
         
-        // List of delivery points
-        deliveryPoints.forEach { point ->
+        items(deliveryPoints) { point ->
             DeliveryPointCard(
                 point = point,
                 onClick = { onPointClick(point) }

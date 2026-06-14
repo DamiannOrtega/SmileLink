@@ -174,21 +174,39 @@ class Command(BaseCommand):
             
             # Guardar metadatos en MongoDB si el estado es 'Entregado' o 'En Proceso'
             if estado in ["Entregado", "En Proceso"] and random.random() > 0.3:
+                tipo_ev = random.choice(["foto", "video", "documento"])
+                nombre_archivo = f"E{entrega.pk}_proof.jpg" if tipo_ev == "foto" else f"E{entrega.pk}_proof.mp4"
+                url_archivo = f"media/evidencias/{nombre_archivo}"
+                
                 mongo_id = guardar_evidencia(
                     entrega_id=entrega.pk,
                     apadrinamiento_id=ap.pk,
                     nino_id=ap.id_nino.pk,
-                    tipo=random.choice(["foto", "video", "documento"]),
-                    url_archivo=f"media/evidencias/E{entrega.pk}_proof.jpg",
+                    tipo=tipo_ev,
+                    url_archivo=url_archivo,
                     metadatos={
                         "tamaño_bytes": random.randint(150000, 500000),
-                        "formato": "JPEG",
-                        "nombre_original": f"foto_evidencia_{entrega.pk}.jpg"
+                        "formato": "JPEG" if tipo_ev == "foto" else "MP4",
+                        "nombre_original": f"foto_evidencia_{entrega.pk}.jpg" if tipo_ev == "foto" else f"evidencia_{entrega.pk}.mp4"
                     },
                     subido_por=ap.id_padrino.email
                 )
                 entrega.mongo_evidencia_id = mongo_id
                 entrega.save()
+                
+                if tipo_ev == "foto":
+                    try:
+                        import os
+                        from django.conf import settings
+                        from PIL import Image
+                        folder_path = os.path.join(settings.MEDIA_ROOT, 'evidencias')
+                        os.makedirs(folder_path, exist_ok=True)
+                        file_path = os.path.join(folder_path, f"E{entrega.pk}_proof.jpg")
+                        if not os.path.exists(file_path):
+                            img = Image.new('RGB', (400, 300), color=(127, 216, 190))
+                            img.save(file_path, 'JPEG')
+                    except Exception as img_err:
+                        self.stdout.write(f"Advertencia: No se pudo crear la imagen dummy para entrega {entrega.pk}: {img_err}")
                 
             # Registrar bitácora de entrega
             registrar_bitacora(ap.id_padrino.pk, 'api_entrega', 'CREATE', {'entrega_id': entrega.pk})

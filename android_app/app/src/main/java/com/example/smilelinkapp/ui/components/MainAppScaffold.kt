@@ -92,7 +92,8 @@ fun MainAppScaffold() {
     ) { paddingValues ->
         SmileLinkNavGraph(
             navController = navController,
-            startDestination = startDestination
+            startDestination = startDestination,
+            modifier = Modifier.padding(paddingValues)
         )
     }
 }

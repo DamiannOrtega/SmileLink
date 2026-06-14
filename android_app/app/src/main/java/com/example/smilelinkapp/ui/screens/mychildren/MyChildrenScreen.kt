@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -319,16 +320,32 @@ private fun DeliveryStatusItem(
                         Text("Anexar", style = MaterialTheme.typography.labelMedium)
                     }
                 } else {
-                    Surface(
-                        color = SuccessGreen.copy(alpha = 0.2f),
-                        shape = MaterialTheme.shapes.extraSmall
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Text(
-                            text = "Evidencia ✓",
-                            color = SuccessGreen,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                        Surface(
+                            color = SuccessGreen.copy(alpha = 0.2f),
+                            shape = MaterialTheme.shapes.extraSmall
+                        ) {
+                            Text(
+                                text = "Evidencia ✓",
+                                color = SuccessGreen,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onUploadEvidence(entrega) },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Editar evidencia",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 }
             }
