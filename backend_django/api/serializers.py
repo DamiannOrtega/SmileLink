@@ -232,6 +232,12 @@ class EntregaSerializer(serializers.ModelSerializer):
         val = getattr(obj, '_evidencias_nosql', None)
         if val is not None:
             return val
+        
+        # Check context to avoid N+1 query overhead in lists
+        evidencias_dict = self.context.get('evidencias_dict')
+        if evidencias_dict is not None:
+            return evidencias_dict.get(obj.pk, [])
+
         from api.mongo_client import obtener_evidencias
         try:
             return obtener_evidencias(obj.pk)

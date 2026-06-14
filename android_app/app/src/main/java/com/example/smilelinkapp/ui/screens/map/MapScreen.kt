@@ -1,5 +1,8 @@
 package com.example.smilelinkapp.ui.screens.map
 
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,17 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.smilelinkapp.data.model.PuntoEntrega
 import com.example.smilelinkapp.ui.components.ErrorMessage
 import com.example.smilelinkapp.ui.components.LoadingIndicator
 import com.example.smilelinkapp.ui.theme.OceanBlue
-import com.google.android.gms.maps.model.CameraPosition
-import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.GoogleMap
-import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
-import com.google.maps.android.compose.rememberCameraPositionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,9 +88,42 @@ private fun MapContent(
     deliveryPoints: List<PuntoEntrega>,
     onPointClick: (PuntoEntrega) -> Unit
 ) {
-    val Aguascalientes = LatLng(21.8853, -102.2916)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(Aguascalientes, 12f)
+    val htmlContent = remember(deliveryPoints) {
+        val markersJs = deliveryPoints.joinToString("\n") { point ->
+            "addMarker(${point.latitud}, ${point.longitud}, '${point.nombrePunto.replace("'", "\\'")}');"
+        }
+        
+        """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <style>
+                body { margin: 0; padding: 0; }
+                #map { height: 100vh; width: 100vw; }
+            </style>
+        </head>
+        <body>
+            <div id="map"></div>
+            <script>
+                var map = L.map('map', { zoomControl: true }).setView([21.8853, -102.2916], 12);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+                }).addTo(map);
+                
+                function addMarker(lat, lng, title) {
+                    var marker = L.marker([lat, lng]).addTo(map);
+                    marker.bindPopup("<b>" + title + "</b>");
+                }
+                
+                $markersJs
+            </script>
+        </body>
+        </html>
+        """.trimIndent()
     }
 
     LazyColumn(
@@ -101,24 +132,34 @@ private fun MapContent(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            GoogleMap(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp)
-                    .clip(MaterialTheme.shapes.medium),
-                cameraPositionState = cameraPositionState
+                    .height(300.dp),
+                shape = MaterialTheme.shapes.medium,
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                deliveryPoints.forEach { point ->
-                    Marker(
-                        state = remember { MarkerState(position = LatLng(point.latitud, point.longitud)) },
-                        title = point.nombrePunto,
-                        snippet = point.direccionFisica,
-                        onClick = {
-                            onPointClick(point)
-                            true
+                AndroidView(
+                    factory = { context ->
+                        WebView(context).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            webViewClient = WebViewClient()
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.userAgentString = "SmileLinkApp/1.0 (Android; Mobile; carlos.ortega@smilelink.org)"
+                            settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
                         }
-                    )
-                }
+                    },
+                    update = { webView ->
+                        webView.settings.userAgentString = "SmileLinkApp/1.0 (Android; Mobile; carlos.ortega@smilelink.org)"
+                        webView.loadDataWithBaseURL("https://openstreetmap.org", htmlContent, "text/html", "UTF-8", null)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
         

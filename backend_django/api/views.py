@@ -404,7 +404,17 @@ class EntregasViewSet(viewsets.ViewSet):
         apadrinamiento_id = request.query_params.get('apadrinamiento_id')
         if apadrinamiento_id:
             qs = qs.filter(id_apadrinamiento_id=apadrinamiento_id)
-        serializer = EntregaSerializer(qs, many=True)
+
+        # Pre-cargar evidencias de MongoDB en una sola consulta
+        entrega_ids = [e.pk for e in qs]
+        try:
+            from .mongo_client import obtener_evidencias_por_entregas
+            evidencias_dict = obtener_evidencias_por_entregas(entrega_ids)
+        except Exception as e:
+            logger.warning(f"No se pudieron pre-cargar las evidencias desde MongoDB: {e}")
+            evidencias_dict = {}
+
+        serializer = EntregaSerializer(qs, many=True, context={'evidencias_dict': evidencias_dict})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):

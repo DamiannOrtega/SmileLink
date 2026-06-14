@@ -1,5 +1,6 @@
 package com.example.smilelinkapp.ui.screens.mychildren
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,8 +8,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -29,6 +32,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.smilelinkapp.ui.theme.SuccessGreen
 import com.example.smilelinkapp.ui.theme.WarningOrange
+import android.content.Intent
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +46,7 @@ fun MyChildrenScreen(
     var selectedDeliveryId by remember { mutableStateOf<String?>(null) }
     var isUploading by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var previewImageModel by remember { mutableStateOf<Any?>(null) }
 
     // Stop refresh indicator once state changes from Loading
     LaunchedEffect(uiState) {
@@ -50,7 +55,6 @@ fun MyChildrenScreen(
         }
     }
 
-    
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -86,6 +90,41 @@ fun MyChildrenScreen(
                 ) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     Text("Guardando archivo y metadatos...", style = MaterialTheme.typography.bodyMedium)
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    // Modal dialog for full screen image preview
+    previewImageModel?.let { model ->
+        AlertDialog(
+            onDismissRequest = { previewImageModel = null },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Vista Previa", style = MaterialTheme.typography.titleMedium)
+                    IconButton(onClick = { previewImageModel = null }) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar")
+                    }
+                }
+            },
+            text = {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    AsyncImage(
+                        model = model,
+                        contentDescription = "Vista previa de la imagen",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
                 }
             },
             confirmButton = {}
@@ -136,6 +175,18 @@ fun MyChildrenScreen(
                                 onUploadEvidence = { entrega ->
                                     selectedDeliveryId = entrega.idEntrega
                                     launcher.launch("image/*")
+                                },
+                                onPreviewImage = { model ->
+                                    previewImageModel = model
+                                },
+                                onShareDelivery = { entrega, childName ->
+                                    val sendIntent: Intent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, "¡Hola! Te comparto que la entrega del regalo (${entrega.descripcionRegalo}) para mi ahijado/a $childName ya se encuentra registrada como: ${entrega.estadoEntrega}.")
+                                        type = "text/plain"
+                                    }
+                                    val shareIntent = Intent.createChooser(sendIntent, null)
+                                    context.startActivity(shareIntent)
                                 }
                             )
                         }
@@ -165,7 +216,9 @@ fun MyChildrenScreen(
 private fun SponsoredChildCard(
     childInfo: SponsoredChildInfo,
     onClick: () -> Unit,
-    onUploadEvidence: (Entrega) -> Unit
+    onUploadEvidence: (Entrega) -> Unit,
+    onPreviewImage: (Any) -> Unit,
+    onShareDelivery: (Entrega, String) -> Unit
 ) {
     Card(
         onClick = onClick,
@@ -203,7 +256,8 @@ private fun SponsoredChildCard(
                     contentDescription = "Foto de ${childInfo.nino.nombre}",
                     modifier = Modifier
                         .size(64.dp)
-                        .clip(CircleShape),
+                        .clip(CircleShape)
+                        .clickable { onPreviewImage(imageModel) },
                     contentScale = ContentScale.Crop
                 )
                 
@@ -238,7 +292,10 @@ private fun SponsoredChildCard(
                 childInfo.entregas.forEach { entrega ->
                     DeliveryStatusItem(
                         entrega = entrega,
-                        onUploadEvidence = onUploadEvidence
+                        childName = childInfo.nino.nombre,
+                        onUploadEvidence = onUploadEvidence,
+                        onPreviewImage = onPreviewImage,
+                        onShareDelivery = onShareDelivery
                     )
                 }
             } else {
@@ -266,7 +323,10 @@ private fun SponsoredChildCard(
 @Composable
 private fun DeliveryStatusItem(
     entrega: Entrega,
-    onUploadEvidence: (Entrega) -> Unit
+    childName: String,
+    onUploadEvidence: (Entrega) -> Unit,
+    onPreviewImage: (Any) -> Unit,
+    onShareDelivery: (Entrega, String) -> Unit
 ) {
     val (icon, color, statusText) = when (entrega.estadoEntrega) {
         "Entregado" -> Triple(Icons.Default.CheckCircle, SuccessGreen, "Entregado")
@@ -308,6 +368,19 @@ private fun DeliveryStatusItem(
                         text = "$statusText • ${entrega.fechaProgramada}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                // Share button
+                IconButton(
+                    onClick = { onShareDelivery(entrega, childName) },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Compartir entrega",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 
@@ -369,7 +442,8 @@ private fun DeliveryStatusItem(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(140.dp)
-                        .clip(MaterialTheme.shapes.small),
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable { onPreviewImage(photoUrl) },
                     contentScale = ContentScale.Crop
                 )
             }

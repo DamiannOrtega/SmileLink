@@ -101,6 +101,30 @@ def obtener_evidencias(entrega_id: int) -> list:
     return evidencias
 
 
+def obtener_evidencias_por_entregas(entrega_ids: list) -> dict:
+    """
+    Obtiene todas las evidencias para una lista de entregas desde MongoDB en una sola consulta.
+    Retorna un diccionario {entrega_id: [evidencia_doc, ...]}.
+    """
+    if not entrega_ids:
+        return {}
+    db = get_mongo_db()
+    cursor = db.evidencias.find(
+        {'entrega_id': {'$in': entrega_ids}},
+        {'_id': 1, 'entrega_id': 1, 'tipo': 1, 'url_archivo': 1, 'timestamp': 1, 'subido_por': 1}
+    )
+    result = {}
+    for doc in cursor:
+        eid = doc['entrega_id']
+        doc['_id'] = str(doc['_id'])
+        if 'timestamp' in doc and doc['timestamp']:
+            doc['timestamp'] = doc['timestamp'].isoformat()
+        if eid not in result:
+            result[eid] = []
+        result[eid].append(doc)
+    return result
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # BITÁCORA DE EVENTOS
 # ──────────────────────────────────────────────────────────────────────────────
