@@ -985,9 +985,15 @@ class DashboardViewSet(viewsets.ViewSet):
             )
 
         try:
-            limit = int(request.query_params.get('limit', 50))
+            raw_limit = request.query_params.get('limit')
+            if raw_limit in (None, '', '0', 'all'):
+                limit = None
+            else:
+                limit = int(raw_limit)
+                if limit <= 0:
+                    limit = None
         except (TypeError, ValueError):
-            limit = 50
+            limit = None
 
         tipo = request.query_params.get('tipo') or None
         try:
@@ -1014,11 +1020,20 @@ class DashboardViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            limit = min(int(request.query_params.get('limit', 300)), 500)
+            raw_limit = request.query_params.get('limit')
+            if raw_limit in (None, '', '0', 'all'):
+                limit = None
+            else:
+                limit = int(raw_limit)
+                if limit <= 0:
+                    limit = None
         except (TypeError, ValueError):
-            limit = 300
+            limit = None
 
         items = []
+
+        def iter_qs(qs):
+            return qs[:limit] if limit else qs
 
         try:
             if view.startswith('ninos_'):
@@ -1027,7 +1042,7 @@ class DashboardViewSet(viewsets.ViewSet):
                     qs = qs.filter(estado_apadrinamiento='Disponible')
                 elif view == 'ninos_apadrinados':
                     qs = qs.filter(estado_apadrinamiento='Apadrinado')
-                for n in qs.order_by('-id')[:limit]:
+                for n in iter_qs(qs.order_by('-id')):
                     items.append({
                         'id_nino': n.pk,
                         'nombre': descifrar_campo(n.nombre_cifrado),
@@ -1043,7 +1058,7 @@ class DashboardViewSet(viewsets.ViewSet):
                         estado_apadrinamiento_registro='Activo'
                     ).values_list('id_padrino_id', flat=True).distinct()
                     qs = qs.filter(pk__in=activo_ids)
-                for p in qs.order_by('-id')[:limit]:
+                for p in iter_qs(qs.order_by('-id')):
                     items.append({
                         'id_padrino': p.pk,
                         'nombre': descifrar_campo(p.nombre_cifrado),
@@ -1054,7 +1069,7 @@ class DashboardViewSet(viewsets.ViewSet):
                 qs = Apadrinamiento.objects.select_related('id_padrino', 'id_nino').order_by('-id')
                 if view == 'apadrinamientos_activos':
                     qs = qs.filter(estado_apadrinamiento_registro='Activo')
-                for a in qs[:limit]:
+                for a in iter_qs(qs):
                     items.append({
                         'id_apadrinamiento': a.pk,
                         'id_padrino': a.id_padrino_id,
@@ -1072,7 +1087,7 @@ class DashboardViewSet(viewsets.ViewSet):
                     qs = qs.filter(estado_entrega='Entregado')
                 elif view == 'entregas_pendientes':
                     qs = qs.filter(estado_entrega__in=['Pendiente', 'En Proceso'])
-                for e in qs[:limit]:
+                for e in iter_qs(qs):
                     items.append({
                         'id_entrega': e.pk,
                         'descripcion_regalo': e.descripcion_regalo,
@@ -1082,7 +1097,7 @@ class DashboardViewSet(viewsets.ViewSet):
 
             elif view == 'solicitudes_abiertas':
                 qs = Solicitud.objects.filter(estado_solicitud='Abierta').select_related('id_nino').order_by('-id')
-                for s in qs[:limit]:
+                for s in iter_qs(qs):
                     items.append({
                         'id_solicitud': s.pk,
                         'id_nino': s.id_nino_id,
@@ -1093,7 +1108,7 @@ class DashboardViewSet(viewsets.ViewSet):
 
             elif view == 'eventos_activos':
                 qs = Evento.objects.filter(estado_evento__in=['Activo', 'Planeado']).order_by('fecha_inicio')
-                for ev in qs[:limit]:
+                for ev in iter_qs(qs):
                     items.append({
                         'id_evento': ev.pk,
                         'nombre_evento': ev.nombre_evento,

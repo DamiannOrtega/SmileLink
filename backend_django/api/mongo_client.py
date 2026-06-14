@@ -236,17 +236,21 @@ def _serialize_doc(doc: dict) -> dict:
     return doc
 
 
-def listar_contenido_nosql(coleccion: str, limit: int = 50, tipo: str = None) -> list:
+def listar_contenido_nosql(coleccion: str, limit=None, tipo: str = None) -> list:
     """
-    Lista documentos recientes de una colección NoSQL para drill-down del dashboard.
+    Lista documentos de una colección NoSQL para drill-down del dashboard.
 
     Args:
         coleccion: evidencias | ninos_fotos | cartas | bitacora_eventos
-        limit:     máximo de documentos (1–100)
+        limit:     máximo de documentos; None = sin límite
         tipo:      filtro opcional para evidencias (foto, video, documento)
     """
     db = get_mongo_db()
-    limit = max(1, min(int(limit), 100))
+    if limit is not None:
+        limit = max(1, int(limit))
+
+    def apply_limit(cursor):
+        return cursor.limit(limit) if limit else cursor
 
     if coleccion == 'evidencias':
         filt = {}
@@ -257,22 +261,22 @@ def listar_contenido_nosql(coleccion: str, limit: int = 50, tipo: str = None) ->
             '_id': 1, 'tipo': 1, 'url_archivo': 1, 'entrega_id': 1,
             'nino_id': 1, 'subido_por': 1, 'timestamp': 1,
         }
-        cursor = db.evidencias.find(filt, projection).sort('timestamp', -1).limit(limit)
+        cursor = apply_limit(db.evidencias.find(filt, projection).sort('timestamp', -1))
     elif coleccion == 'ninos_fotos':
         projection = {'_id': 1, 'nino_id': 1, 'foto_url': 1}
-        cursor = db.ninos_fotos.find({}, projection).limit(limit)
+        cursor = apply_limit(db.ninos_fotos.find({}, projection))
     elif coleccion == 'cartas':
         projection = {
             '_id': 1, 'nino_id': 1, 'apadrinamiento_id': 1,
             'remitente': 1, 'timestamp': 1,
         }
-        cursor = db.cartas.find({}, projection).sort('timestamp', -1).limit(limit)
+        cursor = apply_limit(db.cartas.find({}, projection).sort('timestamp', -1))
     elif coleccion == 'bitacora_eventos':
         projection = {
             '_id': 1, 'tabla': 1, 'accion': 1,
             'usuario_id': 1, 'timestamp': 1,
         }
-        cursor = db.bitacora_eventos.find({}, projection).sort('timestamp', -1).limit(limit)
+        cursor = apply_limit(db.bitacora_eventos.find({}, projection).sort('timestamp', -1))
     else:
         return []
 

@@ -1171,13 +1171,18 @@ export interface NoSQLContenidoResponse {
   items: NoSQLContenidoItem[];
 }
 
+/** Intervalo de auto-actualización del dashboard y drill-downs (ms) */
+export const DASHBOARD_AUTO_REFRESH_MS = 30_000;
+
 /** Fallback cuando el servidor aún no tiene /dashboard/nosql_contenido/ */
 async function loadNoSQLContenidoFallback(
   coleccion: NoSQLColeccion,
   options?: { limit?: number; tipo?: string }
 ): Promise<NoSQLContenidoResponse> {
-  const limit = options?.limit ?? 50;
+  const limit = options?.limit;
   const tipo = options?.tipo?.toLowerCase();
+  const maybeSlice = <T,>(arr: T[]) =>
+    limit != null && limit > 0 ? arr.slice(0, limit) : arr;
 
   if (coleccion === "evidencias") {
     const entregas = await EntregasService.getAll();
@@ -1211,14 +1216,13 @@ async function loadNoSQLContenidoFallback(
       }
     }
 
-    return { coleccion, total: items.length, items: items.slice(0, limit) };
+    return { coleccion, total: items.length, items: maybeSlice(items) };
   }
 
   if (coleccion === "ninos_fotos") {
     const ninos = await NinosService.getAll();
     const items = ninos
       .filter((n) => n.foto)
-      .slice(0, limit)
       .map((n) => ({
         _id: `nino-foto-${n.id_nino}`,
         nino_id: Number(n.id_nino) || undefined,
@@ -1301,12 +1305,12 @@ function eventoToListItem(ev: Evento): RelationalListItem {
 
 async function loadRelationalListFallback(
   view: string,
-  limit: number
+  limit?: number
 ): Promise<RelationalListResponse> {
   const slice = (items: RelationalListItem[]) => ({
     view,
     total: items.length,
-    items: items.slice(0, limit),
+    items: limit != null && limit > 0 ? items.slice(0, limit) : items,
   });
 
   if (view.startsWith("ninos_")) {
@@ -1494,7 +1498,10 @@ export const DashboardService = {
         ],
       };
     }
-    const params = new URLSearchParams({ coleccion, limit: String(options?.limit ?? 50) });
+    const params = new URLSearchParams({ coleccion });
+    if (options?.limit != null && options.limit > 0) {
+      params.set("limit", String(options.limit));
+    }
     if (options?.tipo) params.set("tipo", options.tipo);
     try {
       return await fetchAPI<NoSQLContenidoResponse>(`/dashboard/nosql_contenido/?${params.toString()}`);
@@ -1507,25 +1514,23 @@ export const DashboardService = {
     view: string,
     options?: { limit?: number }
   ): Promise<RelationalListResponse> {
-    const limit = options?.limit ?? 300;
-
     if (USE_MOCK) {
       await delay();
-      const items = buildMockRelationalList(view, limit);
+      const items = buildMockRelationalList(view, options?.limit);
       return { view, total: items.length, items };
     }
 
-    const params = new URLSearchParams({
-      view,
-      limit: String(limit),
-    });
+    const params = new URLSearchParams({ view });
+    if (options?.limit != null && options.limit > 0) {
+      params.set("limit", String(options.limit));
+    }
     try {
       return await fetchAPI<RelationalListResponse>(
         `/dashboard/relational_list/?${params.toString()}`
       );
     } catch (err) {
       if (!isNotFoundError(err)) throw err;
-      return loadRelationalListFallback(view, limit);
+      return loadRelationalListFallback(view, options?.limit);
     }
   },
 };
@@ -1539,8 +1544,8 @@ export interface RelationalListResponse {
   _error?: string;
 }
 
-function buildMockRelationalList(view: string, limit: number): RelationalListItem[] {
-  const cap = <T>(arr: T[]) => arr.slice(0, limit);
+function buildMockRelationalList(view: string, limit?: number): RelationalListItem[] {
+  const cap = <T>(arr: T[]) => (limit != null && limit > 0 ? arr.slice(0, limit) : arr);
 
   if (view.startsWith("ninos_")) {
     let list = MOCK_NINOS;

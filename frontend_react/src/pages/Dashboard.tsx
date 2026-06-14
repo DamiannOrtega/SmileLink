@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, Heart, Link2, PackageCheck, AlertCircle, Calendar, FileText, Crown, Filter, Database, BarChart3 as BarIcon, PieChart as PieIcon, LineChart as LineIcon, AreaChart as AreaIcon, ImageIcon, ScrollText, ChevronRight, Gift } from "lucide-react";
+import { Users, Heart, Link2, PackageCheck, AlertCircle, Calendar, FileText, Crown, Database, BarChart3 as BarIcon, PieChart as PieIcon, LineChart as LineIcon, AreaChart as AreaIcon, ImageIcon, ScrollText, ChevronRight, Gift } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   DashboardKPIs,
   NoSQLStats,
   NoSQLColeccion,
+  DASHBOARD_AUTO_REFRESH_MS,
   Evento,
   Apadrinamiento,
   relationalItemsToNinos,
@@ -121,10 +122,14 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
+    const timer = setInterval(() => {
+      void refreshDashboardQuietly();
+    }, DASHBOARD_AUTO_REFRESH_MS);
+    return () => clearInterval(timer);
   }, []);
 
-  const loadRelationalCache = async () => {
-    setLoadingRelational(true);
+  const loadRelationalCache = async (silent = false) => {
+    if (!silent) setLoadingRelational(true);
     try {
       const loadOrFallback = async <T,>(
         view: string,
@@ -132,7 +137,7 @@ export default function Dashboard() {
         fallback: () => Promise<T[]>
       ): Promise<T[]> => {
         try {
-          const res = await DashboardService.getRelationalList(view, { limit: 500 });
+          const res = await DashboardService.getRelationalList(view);
           return mapItems(res.items);
         } catch {
           const result = await Promise.resolve(fallback()).catch(() => [] as T[]);
@@ -168,7 +173,29 @@ export default function Dashboard() {
     } catch (err) {
       console.error("Error loading relational cache:", err);
     } finally {
-      setLoadingRelational(false);
+      if (!silent) setLoadingRelational(false);
+    }
+  };
+
+  const refreshDashboardQuietly = async () => {
+    try {
+      const [kpisResult, nosqlResult] = await Promise.allSettled([
+        DashboardService.getKPIs(),
+        DashboardService.getNoSQLStats(),
+      ]);
+
+      if (kpisResult.status === "fulfilled") {
+        setKpis(kpisResult.value);
+        setLoadError(null);
+      }
+
+      if (nosqlResult.status === "fulfilled") {
+        setNosqlStats(nosqlResult.value);
+      }
+
+      await loadRelationalCache(true);
+    } catch (err) {
+      console.error("Error refreshing dashboard:", err);
     }
   };
 
@@ -203,7 +230,7 @@ export default function Dashboard() {
       setLoading(false);
     }
 
-    void loadRelationalCache();
+    void loadRelationalCache(false);
   };
 
   if (loading) {
@@ -283,8 +310,8 @@ export default function Dashboard() {
         </p>
       )}
 
-      {/* Filtros premium */}
-      <section className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 items-end bg-card p-4 rounded-xl border shadow-sm" aria-label="Filtros">
+      {/* Filtros por fecha */}
+      <section className="grid gap-4 sm:grid-cols-2 items-end bg-card p-4 rounded-xl border shadow-sm" aria-label="Filtros">
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-muted-foreground">Desde</label>
           <input type="date" className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
@@ -292,20 +319,6 @@ export default function Dashboard() {
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-muted-foreground">Hasta</label>
           <input type="date" className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-muted-foreground">Estado de Apadrinamiento</label>
-          <select className="w-full bg-background border border-input rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-            <option>Todos los estados</option>
-            <option>Activo</option>
-            <option>Disponible</option>
-            <option>Inactivo</option>
-          </select>
-        </div>
-        <div className="flex justify-end">
-          <button type="button" className="w-full bg-muted hover:bg-muted/80 text-muted-foreground font-semibold text-sm px-4 py-2 rounded-md transition-colors flex items-center justify-center gap-2 border border-border">
-            <Filter className="h-4 w-4" /> Limpiar filtros
-          </button>
         </div>
       </section>
 

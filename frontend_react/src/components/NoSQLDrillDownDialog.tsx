@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -14,7 +14,12 @@ import {
   DashboardService,
   NoSQLColeccion,
   NoSQLContenidoItem,
+  DASHBOARD_AUTO_REFRESH_MS,
 } from "@/services/api";
+import {
+  DrillDownSearchBar,
+  textMatchesQuery,
+} from "@/components/DrillDownSearchBar";
 import {
   ExternalLink,
   FileText,
@@ -59,6 +64,53 @@ function ninoLabel(ninoId: number | undefined, ninosMap: Map<string, string>): s
   return `Niño #${ninoId}`;
 }
 
+function nosqlItemSearchText(
+  item: NoSQLContenidoItem,
+  coleccion: NoSQLColeccion | undefined,
+  ninosMap: Map<string, string>
+): string {
+  const parts = [
+    ninoLabel(item.nino_id, ninosMap),
+    item.tipo,
+    item.subido_por,
+    item.remitente,
+    item.tabla,
+    item.accion,
+    item._id,
+    item.entrega_id != null ? String(item.entrega_id) : "",
+    item.nino_id != null ? String(item.nino_id) : "",
+    item.apadrinamiento_id != null ? String(item.apadrinamiento_id) : "",
+    item.timestamp,
+  ];
+
+  if (coleccion === "evidencias") {
+    parts.push("evidencia", "foto", "video");
+  }
+  if (coleccion === "cartas") {
+    parts.push("carta");
+  }
+  if (coleccion === "bitacora_eventos") {
+    parts.push("bitácora", "log");
+  }
+
+  return parts.filter(Boolean).join(" ");
+}
+
+function nosqlSearchPlaceholder(coleccion: NoSQLColeccion | undefined): string {
+  switch (coleccion) {
+    case "ninos_fotos":
+      return "Buscar por nombre de niño o ID…";
+    case "evidencias":
+      return "Buscar por niño, entrega, tipo o usuario…";
+    case "cartas":
+      return "Buscar por niño, remitente o ID…";
+    case "bitacora_eventos":
+      return "Buscar por tabla, acción o fecha…";
+    default:
+      return "Buscar…";
+  }
+}
+
 export function NoSQLDrillDownDialog({
   target,
   open,
@@ -68,32 +120,57 @@ export function NoSQLDrillDownDialog({
   const navigate = useNavigate();
   const [items, setItems] = useState<NoSQLContenidoItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;
 
     let cancelled = false;
-    setLoading(true);
-    setItems([]);
 
-    DashboardService.getNoSQLContenido(target.coleccion, {
-      limit: 50,
-      tipo: target.tipoFilter,
-    })
-      .then((res) => {
-        if (!cancelled) setItems(res.items);
+    const fetchContent = (initial: boolean) => {
+      if (initial) {
+        setLoading(true);
+        setItems([]);
+        setSearchQuery("");
+      } else {
+        setRefreshing(true);
+      }
+
+      DashboardService.getNoSQLContenido(target.coleccion, {
+        tipo: target.tipoFilter,
       })
-      .catch(() => {
-        if (!cancelled) setItems([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        .then((res) => {
+          if (!cancelled) setItems(res.items);
+        })
+        .catch(() => {
+          if (!cancelled && initial) setItems([]);
+        })
+        .finally(() => {
+          if (cancelled) return;
+          if (initial) setLoading(false);
+          else setRefreshing(false);
+        });
+    };
+
+    fetchContent(true);
+    const timer = setInterval(() => fetchContent(false), DASHBOARD_AUTO_REFRESH_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [open, target]);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    return items.filter((item) =>
+      textMatchesQuery(
+        nosqlItemSearchText(item, target?.coleccion, ninosMap),
+        searchQuery
+      )
+    );
+  }, [items, searchQuery, target?.coleccion, ninosMap]);
 
   const renderEvidencia = (item: NoSQLContenidoItem) => {
     const fullUrl = resolveMediaUrl(item.url_archivo || "");
@@ -246,10 +323,19 @@ export function NoSQLDrillDownDialog({
       );
     }
 
+    if (filteredItems.length === 0) {
+      return (
+        <div className="py-12 text-center text-muted-foreground">
+          <p className="font-medium">Ningún resultado para «{searchQuery.trim()}»</p>
+          <p className="text-xs mt-1 opacity-70">Prueba con el nombre del niño, ID o palabra clave.</p>
+        </div>
+      );
+    }
+
     if (target?.coleccion === "evidencias") {
       return (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map(renderEvidencia)}
+          {filteredItems.map(renderEvidencia)}
         </div>
       );
     }
@@ -257,16 +343,20 @@ export function NoSQLDrillDownDialog({
     if (target?.coleccion === "ninos_fotos") {
       return (
         <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          {items.map(renderFotoNino)}
+          {filteredItems.map(renderFotoNino)}
         </div>
       );
     }
 
     if (target?.coleccion === "cartas") {
-      return <div className="space-y-3">{items.map(renderCarta)}</div>;
+      return <div className="space-y-3">{filteredItems.map(renderCarta)}</div>;
     }
 
-    return <div className="space-y-2 max-h-[60vh] overflow-y-auto">{items.map(renderBitacora)}</div>;
+    return (
+      <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+        {filteredItems.map(renderBitacora)}
+      </div>
+    );
   };
 
   return (
@@ -278,8 +368,17 @@ export function NoSQLDrillDownDialog({
             {target?.tipoFilter
               ? `Filtrado por tipo «${target.tipoFilter}». Clic en una entrega para ver el detalle completo.`
               : "Explora el contenido almacenado en MongoDB. Haz clic en las tarjetas para ir al detalle."}
+            {refreshing ? " Actualizando…" : null}
           </DialogDescription>
         </DialogHeader>
+        <DrillDownSearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={nosqlSearchPlaceholder(target?.coleccion)}
+          totalCount={items.length}
+          filteredCount={filteredItems.length}
+          disabled={loading}
+        />
         {renderContent()}
       </DialogContent>
     </Dialog>

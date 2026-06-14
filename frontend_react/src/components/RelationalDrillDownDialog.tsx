@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Dialog,
@@ -13,7 +13,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   DashboardService,
   RelationalListItem,
+  DASHBOARD_AUTO_REFRESH_MS,
 } from "@/services/api";
+import {
+  DrillDownSearchBar,
+  textMatchesQuery,
+} from "@/components/DrillDownSearchBar";
 import { ChevronRight, ExternalLink } from "lucide-react";
 
 export type RelationalDrillView =
@@ -56,6 +61,43 @@ function strId(value: unknown): string {
   return value == null ? "" : String(value);
 }
 
+function relationalItemSearchText(
+  item: RelationalListItem,
+  kind: DrillKind,
+  ninosMap: Map<string, string>,
+  padrinosMap: Map<string, string>
+): string {
+  const parts = Object.values(item).map((v) => String(v ?? ""));
+
+  if (kind === "asignaciones" || kind === "solicitudes") {
+    parts.push(String(item.nino_nombre ?? ninosMap.get(strId(item.id_nino)) ?? ""));
+  }
+  if (kind === "asignaciones") {
+    parts.push(String(item.padrino_nombre ?? padrinosMap.get(strId(item.id_padrino)) ?? ""));
+  }
+
+  return parts.join(" ");
+}
+
+function searchPlaceholder(kind: DrillKind): string {
+  switch (kind) {
+    case "ninos":
+      return "Buscar por nombre, ID, edad o estado…";
+    case "padrinos":
+      return "Buscar por nombre, email o ID…";
+    case "asignaciones":
+      return "Buscar por niño, padrino o ID…";
+    case "entregas":
+      return "Buscar por regalo, estado o ID…";
+    case "solicitudes":
+      return "Buscar por niño o descripción…";
+    case "eventos":
+      return "Buscar por nombre, tipo o fecha…";
+    default:
+      return "Buscar…";
+  }
+}
+
 interface RelationalDrillDownDialogProps {
   target: RelationalDrillDownTarget | null;
   open: boolean;
@@ -76,38 +118,66 @@ export function RelationalDrillDownDialog({
   const [kind, setKind] = useState<DrillKind>("ninos");
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (!open || !target) return;
 
     let cancelled = false;
-    setLoading(true);
-    setItems([]);
-    setLoadError(null);
-    setKind(viewToKind(target.view));
 
-    DashboardService.getRelationalList(target.view, { limit: 300 })
-      .then((res) => {
-        if (cancelled) return;
-        setItems(res.items);
-        if (res._error) {
-          setLoadError(res._error);
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        const message = err instanceof Error ? err.message : "No se pudo cargar el listado";
-        setLoadError(message);
+    const fetchList = (initial: boolean) => {
+      if (initial) {
+        setLoading(true);
         setItems([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        setLoadError(null);
+        setSearchQuery("");
+        setKind(viewToKind(target.view));
+      } else {
+        setRefreshing(true);
+      }
+
+      DashboardService.getRelationalList(target.view)
+        .then((res) => {
+          if (cancelled) return;
+          setItems(res.items);
+          if (res._error) {
+            setLoadError(res._error);
+          }
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          if (initial) {
+            const message = err instanceof Error ? err.message : "No se pudo cargar el listado";
+            setLoadError(message);
+            setItems([]);
+          }
+        })
+        .finally(() => {
+          if (cancelled) return;
+          if (initial) setLoading(false);
+          else setRefreshing(false);
+        });
+    };
+
+    fetchList(true);
+    const timer = setInterval(() => fetchList(false), DASHBOARD_AUTO_REFRESH_MS);
 
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [open, target]);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    return items.filter((item) =>
+      textMatchesQuery(
+        relationalItemSearchText(item, kind, ninosMap, padrinosMap),
+        searchQuery
+      )
+    );
+  }, [items, searchQuery, kind, ninosMap, padrinosMap]);
 
   const go = (path: string) => {
     onOpenChange(false);
@@ -133,9 +203,16 @@ export function RelationalDrillDownDialog({
         <p className="text-xs mt-2 text-destructive/90 max-w-md mx-auto">{loadError}</p>
       ) : (
         <p className="text-xs mt-1 opacity-70">
-          El contador del dashboard puede incluir registros fuera del límite mostrado (300).
+          Los datos se actualizan automáticamente cada 30 segundos.
         </p>
       )}
+    </div>
+  );
+
+  const noSearchResults = () => (
+    <div className="py-12 text-center text-muted-foreground">
+      <p className="font-medium">Ningún resultado para «{searchQuery.trim()}»</p>
+      <p className="text-xs mt-1 opacity-70">Prueba con otro nombre, ID o palabra clave.</p>
     </div>
   );
 
@@ -150,11 +227,12 @@ export function RelationalDrillDownDialog({
   const renderList = () => {
     if (loading) return loadingState();
     if (items.length === 0) return emptyState();
+    if (filteredItems.length === 0) return noSearchResults();
 
     if (kind === "ninos") {
       return (
         <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-          {items.map((n) => (
+          {filteredItems.map((n) => (
             <button
               key={strId(n.id_nino)}
               type="button"
@@ -184,7 +262,7 @@ export function RelationalDrillDownDialog({
     if (kind === "padrinos") {
       return (
         <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-          {items.map((p) => (
+          {filteredItems.map((p) => (
             <button
               key={strId(p.id_padrino)}
               type="button"
@@ -205,7 +283,7 @@ export function RelationalDrillDownDialog({
     if (kind === "asignaciones") {
       return (
         <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-          {items.map((a) => (
+          {filteredItems.map((a) => (
             <button
               key={strId(a.id_apadrinamiento)}
               type="button"
@@ -233,7 +311,7 @@ export function RelationalDrillDownDialog({
     if (kind === "entregas") {
       return (
         <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-          {items.map((e) => (
+          {filteredItems.map((e) => (
             <button
               key={strId(e.id_entrega)}
               type="button"
@@ -264,7 +342,7 @@ export function RelationalDrillDownDialog({
     if (kind === "solicitudes") {
       return (
         <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-          {items.map((s) => (
+          {filteredItems.map((s) => (
             <button
               key={strId(s.id_solicitud)}
               type="button"
@@ -289,7 +367,7 @@ export function RelationalDrillDownDialog({
     if (kind === "eventos") {
       return (
         <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-          {items.map((ev) => (
+          {filteredItems.map((ev) => (
             <div
               key={strId(ev.id_evento)}
               className="flex items-center justify-between rounded-lg border bg-card p-4"
@@ -322,9 +400,17 @@ export function RelationalDrillDownDialog({
           <DialogTitle>{target?.label ?? "Detalle"}</DialogTitle>
           <DialogDescription>
             Datos desde MySQL. Selecciona un registro para ir a su detalle.
-            {!loading && items.length > 0 ? ` Mostrando ${items.length} registros.` : null}
+            {refreshing ? " Actualizando…" : null}
           </DialogDescription>
         </DialogHeader>
+        <DrillDownSearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder={searchPlaceholder(kind)}
+          totalCount={items.length}
+          filteredCount={filteredItems.length}
+          disabled={loading}
+        />
         {renderList()}
       </DialogContent>
     </Dialog>
