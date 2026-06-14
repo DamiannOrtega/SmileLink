@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Package, MapPin, User, Heart, Calendar, FileText, Image as ImageIcon, Video, FileDown } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ArrowLeft, Package, MapPin, User, Heart, Calendar, FileText, Image as ImageIcon, Video, FileDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import {
   EntregasService,
@@ -35,6 +36,7 @@ export default function EntregaDetalle() {
   const [nino, setNino] = useState<Nino | null>(null);
   const [padrino, setPadrino] = useState<Padrino | null>(null);
   const [loading, setLoading] = useState(true);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -254,15 +256,20 @@ export default function EntregaDetalle() {
                   <Card key={ev._id} className="overflow-hidden border border-border bg-muted/20">
                     <div className="aspect-video bg-black flex items-center justify-center relative group">
                       {ev.tipo === "foto" ? (
-                        <img 
-                          src={fullUrl} 
-                          alt="Evidencia de entrega" 
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            // Si falla la carga, muestra icono
-                            (e.target as HTMLElement).style.display = "none";
-                          }}
-                        />
+                        <div className="relative w-full h-full cursor-pointer group/img" onClick={() => setPreviewImageUrl(fullUrl)}>
+                          <img 
+                            src={fullUrl} 
+                            alt="Evidencia de entrega" 
+                            className="w-full h-full object-cover transition-all group-hover/img:brightness-75"
+                            onError={(e) => {
+                              // Si falla la carga, muestra icono
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                            <Search className="h-6 w-6 text-white drop-shadow-md" />
+                          </div>
+                        </div>
                       ) : ev.tipo === "video" ? (
                         <video src={fullUrl} className="w-full h-full object-cover" controls />
                       ) : (
@@ -302,6 +309,20 @@ export default function EntregaDetalle() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!previewImageUrl} onOpenChange={(open) => !open && setPreviewImageUrl(null)}>
+        <DialogContent className="max-w-3xl p-1 bg-black/90 border-none overflow-hidden flex items-center justify-center">
+          <div className="relative w-full max-h-[80vh] flex items-center justify-center p-2">
+            {previewImageUrl && (
+              <img
+                src={previewImageUrl}
+                alt="Vista previa de evidencia"
+                className="max-w-full max-h-[75vh] object-contain rounded-md"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

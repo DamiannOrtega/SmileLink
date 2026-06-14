@@ -18,6 +18,7 @@ import coil.compose.AsyncImage
 import com.example.smilelinkapp.config.AppConfig
 import com.example.smilelinkapp.data.local.SessionManager
 import com.example.smilelinkapp.data.repository.SmileLinkRepository
+import com.example.smilelinkapp.data.model.Padrino
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -299,12 +300,18 @@ fun ProfileScreen(
                             isSaving = true
                             val originalPadrino = sessionManager.getPadrino()
                             if (originalPadrino != null) {
-                                val updatedPadrino = originalPadrino.copy(
+                                val updatedPadrino = Padrino(
+                                    idPadrino = (originalPadrino.idPadrino as? String) ?: "",
                                     nombre = editName,
+                                    email = (originalPadrino.email as? String) ?: "",
+                                    passwordHash = originalPadrino.passwordHash,
+                                    fechaRegistro = (originalPadrino.fechaRegistro as? String) ?: "",
+                                    idGoogleAuth = originalPadrino.idGoogleAuth,
                                     direccion = editAddress,
-                                    telefono = editPhone
+                                    telefono = editPhone,
+                                    historialApadrinamientoIds = (originalPadrino.historialApadrinamientoIds as? List<String>) ?: emptyList()
                                 )
-                                val result = repository.updatePadrino(originalPadrino.idPadrino, updatedPadrino)
+                                val result = repository.updatePadrino(updatedPadrino.idPadrino, updatedPadrino)
                                 if (result.isSuccess) {
                                     val savedPadrino = result.getOrNull() ?: updatedPadrino
                                     sessionManager.saveSession(savedPadrino)

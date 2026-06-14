@@ -66,7 +66,7 @@ data class Padrino(
     val telefono: String? = null,
     
     @SerializedName("historial_apadrinamiento_ids")
-    val historialApadrinamientoIds: List<String> = emptyList()
+    val historialApadrinamientoIds: List<String>? = emptyList()
 )
 
 /**
@@ -95,7 +95,7 @@ data class Apadrinamiento(
     val estadoApadrinamientoRegistro: String = "Activo", // "Activo" or "Finalizado"
     
     @SerializedName("entregas_ids")
-    val entregasIds: List<String> = emptyList()
+    val entregasIds: List<String>? = emptyList()
 )
 
 /**

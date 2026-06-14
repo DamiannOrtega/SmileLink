@@ -428,7 +428,15 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
     throw new Error(message);
   }
 
-  const data = await response.json();
+  if (response.status === 204) {
+    return null as unknown as T;
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return null as unknown as T;
+  }
+  const data = JSON.parse(text);
 
   // Django REST Framework retorna respuestas paginadas: {count, next, previous, results:[...]}
   // El frontend espera arrays directos, así que extraemos .results si existe

@@ -16,6 +16,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   EntregasService,
   Entrega,
@@ -32,6 +33,7 @@ export default function Entregas() {
   const navigate = useNavigate();
   const [entregas, setEntregas] = useState<Entrega[]>([]);
   const [loading, setLoading] = useState(true);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [puntosMap, setPuntosMap] = useState<Map<string, string>>(new Map());
   const [statusFilter, setStatusFilter] = useState("Todos");
@@ -65,13 +67,23 @@ export default function Entregas() {
       const matchesSearch = entrega.descripcion_regalo.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === "Todos" || entrega.estado_entrega === statusFilter;
       
-      const entregaDate = new Date(entrega.fecha_programada);
+      // Si el estado es Entregado, filtramos por la fecha real de entrega, si no, por la fecha programada
+      const targetDateStr = (statusFilter === "Entregado" && entrega.fecha_entrega_real)
+        ? entrega.fecha_entrega_real
+        : entrega.fecha_programada;
+      
+      const entregaDate = new Date(targetDateStr);
       const matchesStart = !startDate || entregaDate >= new Date(startDate);
       const matchesEnd = !endDate || entregaDate <= new Date(endDate);
       
       return matchesSearch && matchesStatus && matchesStart && matchesEnd;
     })
     .sort((a, b) => {
+      if (sortBy === "delivered_recent") {
+        const dateA = a.fecha_entrega_real ? new Date(a.fecha_entrega_real).getTime() : 0;
+        const dateB = b.fecha_entrega_real ? new Date(b.fecha_entrega_real).getTime() : 0;
+        return dateB - dateA;
+      }
       const dateA = new Date(a.fecha_programada).getTime();
       const dateB = new Date(b.fecha_programada).getTime();
       return sortBy === "recent" ? dateB - dateA : dateA - dateB;
@@ -161,8 +173,9 @@ export default function Entregas() {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input/60 bg-background/50 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
               >
-                <option value="recent">Más recientes primero</option>
-                <option value="oldest">Más antiguos primero</option>
+                <option value="recent">Fecha Prog. (Recientes primero)</option>
+                <option value="oldest">Fecha Prog. (Antiguos primero)</option>
+                <option value="delivered_recent">Fecha Real (Recién entregadas primero)</option>
               </select>
             </div>
 
@@ -233,12 +246,20 @@ export default function Entregas() {
                           ? firstPhoto.url_archivo
                           : `${BACKEND_URL}/${firstPhoto.url_archivo}`;
                         return (
-                          <img
-                            src={fullUrl}
-                            alt="Evidencia"
-                            className="w-10 h-10 object-cover rounded border border-border cursor-pointer hover:scale-110 transition-transform"
-                            onClick={() => navigate(`/entregas/${entrega.id_entrega}`)}
-                          />
+                          <div className="relative group w-10 h-10 overflow-hidden rounded border border-border cursor-pointer">
+                            <img
+                              src={fullUrl}
+                              alt="Evidencia"
+                              className="w-10 h-10 object-cover transition-all group-hover:scale-110 group-hover:brightness-75"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewImageUrl(fullUrl);
+                              }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                              <Search className="h-3.5 w-3.5 text-white" />
+                            </div>
+                          </div>
                         );
                       } else if (entrega.mongo_evidencia_id || entrega.evidencia_foto_path) {
                         return <Badge variant="default">✓ Evidencia</Badge>;
@@ -262,6 +283,20 @@ export default function Entregas() {
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!previewImageUrl} onOpenChange={(open) => !open && setPreviewImageUrl(null)}>
+        <DialogContent className="max-w-3xl p-1 bg-black/90 border-none overflow-hidden flex items-center justify-center">
+          <div className="relative w-full max-h-[80vh] flex items-center justify-center p-2">
+            {previewImageUrl && (
+              <img
+                src={previewImageUrl}
+                alt="Vista previa de evidencia"
+                className="max-w-full max-h-[75vh] object-contain rounded-md"
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
