@@ -439,6 +439,10 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
   return data as T;
 }
 
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
 
 // ============================================================================
 // NORMALIZADORES — Mapean campos del nuevo Django API al formato del frontend
@@ -472,8 +476,8 @@ const normPadrino = (p: any): Padrino => ({
 
 const normApadrinamiento = (a: any): Apadrinamiento => ({
   id_apadrinamiento: String(a.id),
-  id_padrino: String(a.id_padrino),
-  id_nino: String(a.id_nino),
+  id_padrino: String(a.id_padrino ?? a.id_padrino_id ?? ""),
+  id_nino: String(a.id_nino ?? a.id_nino_id ?? ""),
   id_evento: a.id_evento != null ? String(a.id_evento) : undefined,
   fecha_inicio: a.fecha_inicio,
   fecha_fin: a.fecha_fin ?? undefined,
@@ -551,7 +555,7 @@ export const NinosService = {
       return [...MOCK_NINOS];
     }
     const raw = await fetchAPI<any[]>("/ninos/");
-    return raw.map(normNino);
+    return ensureArray<any>(raw).map(normNino);
   },
 
   async getById(id: string): Promise<Nino | null> {
@@ -617,7 +621,7 @@ export const PadrinosService = {
       return [...MOCK_PADRINOS];
     }
     const raw = await fetchAPI<any[]>("/padrinos/");
-    return raw.map(normPadrino);
+    return ensureArray<any>(raw).map(normPadrino);
   },
 
   async getById(id: string): Promise<Padrino | null> {
@@ -684,7 +688,7 @@ export const ApadrinamientosService = {
       return [...MOCK_APADRINAMIENTOS];
     }
     const raw = await fetchAPI<any[]>("/apadrinamientos/");
-    return raw.map(normApadrinamiento);
+    return ensureArray<any>(raw).map(normApadrinamiento);
   },
 
   async getById(id: string): Promise<Apadrinamiento | null> {
@@ -768,7 +772,7 @@ export const EntregasService = {
       return [...MOCK_ENTREGAS];
     }
     const raw = await fetchAPI<any[]>("/entregas/");
-    return raw.map(normEntrega);
+    return ensureArray<any>(raw).map(normEntrega);
   },
 
   async getById(id: string): Promise<Entrega | null> {
@@ -842,7 +846,7 @@ export const SolicitudesService = {
       return [...MOCK_SOLICITUDES];
     }
     const raw = await fetchAPI<any[]>("/solicitudes/");
-    return raw.map(normSolicitud);
+    return ensureArray<any>(raw).map(normSolicitud);
   },
 
   async getById(id: string): Promise<SolicitudRegalo | null> {
@@ -1054,7 +1058,7 @@ export const EventosService = {
       return [...MOCK_EVENTOS];
     }
     const raw = await fetchAPI<any[]>("/eventos/");
-    return raw.map(normEvento);
+    return ensureArray<any>(raw).map(normEvento);
   },
 
   async getById(id: string): Promise<Evento | null> {
@@ -1136,11 +1140,243 @@ export interface NoSQLStats {
     evidencias: number;
     bitacora_eventos: number;
     cartas: number;
-    historial_notificaciones: number;
+    ninos_fotos: number;
   };
   eventos_por_tabla: Array<{ tabla: string; cantidad: number }>;
   eventos_por_accion: Array<{ accion: string; cantidad: number }>;
   evidencias_por_tipo: Array<{ tipo: string; cantidad: number }>;
+}
+
+export type NoSQLColeccion = "evidencias" | "ninos_fotos" | "cartas" | "bitacora_eventos";
+
+export interface NoSQLContenidoItem {
+  _id: string;
+  tipo?: string;
+  url_archivo?: string;
+  entrega_id?: number;
+  nino_id?: number;
+  apadrinamiento_id?: number;
+  foto_url?: string;
+  remitente?: string;
+  tabla?: string;
+  accion?: string;
+  usuario_id?: number | string;
+  subido_por?: string;
+  timestamp?: string;
+}
+
+export interface NoSQLContenidoResponse {
+  coleccion: NoSQLColeccion;
+  total: number;
+  items: NoSQLContenidoItem[];
+}
+
+/** Fallback cuando el servidor aún no tiene /dashboard/nosql_contenido/ */
+async function loadNoSQLContenidoFallback(
+  coleccion: NoSQLColeccion,
+  options?: { limit?: number; tipo?: string }
+): Promise<NoSQLContenidoResponse> {
+  const limit = options?.limit ?? 50;
+  const tipo = options?.tipo?.toLowerCase();
+
+  if (coleccion === "evidencias") {
+    const entregas = await EntregasService.getAll();
+    let candidatas = entregas.filter((e) => e.mongo_evidencia_id);
+    if (candidatas.length === 0) {
+      candidatas = entregas.filter(
+        (e) => e.estado_entrega === "Entregado" || e.estado_entrega === "En Proceso"
+      );
+    }
+    if (candidatas.length === 0) {
+      candidatas = entregas.slice(0, 30);
+    }
+
+    const detalles = await Promise.all(
+      candidatas.map((e) => EntregasService.getById(e.id_entrega))
+    );
+
+    const items: NoSQLContenidoItem[] = [];
+    for (const entrega of detalles) {
+      if (!entrega?.evidencias_nosql?.length) continue;
+      for (const ev of entrega.evidencias_nosql) {
+        if (tipo && ev.tipo?.toLowerCase() !== tipo) continue;
+        items.push({
+          _id: ev._id,
+          tipo: ev.tipo,
+          url_archivo: ev.url_archivo,
+          entrega_id: Number(entrega.id_entrega) || undefined,
+          subido_por: ev.subido_por,
+          timestamp: ev.timestamp,
+        });
+      }
+    }
+
+    return { coleccion, total: items.length, items: items.slice(0, limit) };
+  }
+
+  if (coleccion === "ninos_fotos") {
+    const ninos = await NinosService.getAll();
+    const items = ninos
+      .filter((n) => n.foto)
+      .slice(0, limit)
+      .map((n) => ({
+        _id: `nino-foto-${n.id_nino}`,
+        nino_id: Number(n.id_nino) || undefined,
+        foto_url: n.foto,
+      }));
+    return { coleccion, total: items.length, items };
+  }
+
+  return { coleccion, total: 0, items: [] };
+}
+
+function isNotFoundError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /404|not found|no encontrad/i.test(msg);
+}
+
+function ninoToListItem(n: Nino): RelationalListItem {
+  return {
+    id_nino: n.id_nino,
+    nombre: n.nombre,
+    edad: n.edad,
+    genero: n.genero,
+    estado_apadrinamiento: n.estado_apadrinamiento,
+  };
+}
+
+function padrinoToListItem(p: Padrino): RelationalListItem {
+  return {
+    id_padrino: p.id_padrino,
+    nombre: p.nombre,
+    email: p.email,
+  };
+}
+
+function apadrinamientoToListItem(
+  a: Apadrinamiento,
+  ninosMap?: Map<string, string>,
+  padrinosMap?: Map<string, string>
+): RelationalListItem {
+  return {
+    id_apadrinamiento: a.id_apadrinamiento,
+    id_padrino: a.id_padrino,
+    id_nino: a.id_nino,
+    nino_nombre: ninosMap?.get(a.id_nino),
+    padrino_nombre: padrinosMap?.get(a.id_padrino),
+    estado_apadrinamiento_registro: a.estado_apadrinamiento_registro,
+    tipo_apadrinamiento: a.tipo_apadrinamiento,
+    fecha_inicio: a.fecha_inicio,
+  };
+}
+
+function entregaToListItem(e: Entrega): RelationalListItem {
+  return {
+    id_entrega: e.id_entrega,
+    descripcion_regalo: e.descripcion_regalo,
+    fecha_programada: e.fecha_programada,
+    estado_entrega: e.estado_entrega,
+  };
+}
+
+function solicitudToListItem(s: SolicitudRegalo, ninosMap?: Map<string, string>): RelationalListItem {
+  return {
+    id_solicitud: s.id_solicitud,
+    id_nino: s.id_nino,
+    nino_nombre: ninosMap?.get(s.id_nino),
+    descripcion_solicitud: s.descripcion_solicitud,
+    estado_solicitud: s.estado_solicitud,
+  };
+}
+
+function eventoToListItem(ev: Evento): RelationalListItem {
+  return {
+    id_evento: ev.id_evento,
+    nombre_evento: ev.nombre_evento,
+    tipo_evento: ev.tipo_evento,
+    fecha_inicio: ev.fecha_inicio,
+    estado_evento: ev.estado_evento,
+  };
+}
+
+async function loadRelationalListFallback(
+  view: string,
+  limit: number
+): Promise<RelationalListResponse> {
+  const slice = (items: RelationalListItem[]) => ({
+    view,
+    total: items.length,
+    items: items.slice(0, limit),
+  });
+
+  if (view.startsWith("ninos_")) {
+    let endpoint = "/ninos/";
+    if (view === "ninos_disponibles") {
+      endpoint = "/ninos/disponibles/";
+    } else if (view === "ninos_apadrinados") {
+      endpoint = "/ninos/?estado=Apadrinado";
+    }
+    const raw = await fetchAPI<any[]>(endpoint);
+    const ninos = ensureArray<any>(raw).map(normNino);
+    return slice(ninos.map(ninoToListItem));
+  }
+
+  if (view.startsWith("padrinos_")) {
+    const raw = await fetchAPI<any[]>("/padrinos/");
+    let padrinos = ensureArray<any>(raw).map(normPadrino);
+    if (view === "padrinos_activos") {
+      const apRaw = await fetchAPI<any[]>("/apadrinamientos/?estado=Activo");
+      const activos = new Set(
+        ensureArray<any>(apRaw).map((a) => String(a.id_padrino ?? a.id_padrino_id ?? ""))
+      );
+      padrinos = padrinos.filter((p) => activos.has(p.id_padrino));
+    }
+    return slice(padrinos.map(padrinoToListItem));
+  }
+
+  if (view.startsWith("apadrinamientos_")) {
+    let endpoint = "/apadrinamientos/";
+    if (view === "apadrinamientos_activos") {
+      endpoint = "/apadrinamientos/?estado=Activo";
+    }
+    const raw = await fetchAPI<any[]>(endpoint);
+    let list = ensureArray<any>(raw).map(normApadrinamiento);
+    if (view === "apadrinamientos_todos") {
+      list = [...list].sort(
+        (a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime()
+      );
+    }
+    return slice(list.map((a) => apadrinamientoToListItem(a)));
+  }
+
+  if (view.startsWith("entregas_")) {
+    const raw = await fetchAPI<any[]>("/entregas/");
+    let entregas = ensureArray<any>(raw).map(normEntrega);
+    if (view === "entregas_completadas") {
+      entregas = entregas.filter((e) => e.estado_entrega === "Entregado");
+    } else if (view === "entregas_pendientes") {
+      entregas = entregas.filter(
+        (e) => e.estado_entrega === "Pendiente" || e.estado_entrega === "En Proceso"
+      );
+    }
+    return slice(entregas.map(entregaToListItem));
+  }
+
+  if (view === "solicitudes_abiertas") {
+    const raw = await fetchAPI<any[]>("/solicitudes/?estado=Abierta");
+    const solicitudes = ensureArray<any>(raw).map(normSolicitud);
+    return slice(solicitudes.map((s) => solicitudToListItem(s)));
+  }
+
+  if (view === "eventos_activos") {
+    const raw = await fetchAPI<any[]>("/eventos/");
+    const eventos = ensureArray<any>(raw)
+      .map(normEvento)
+      .filter((e) => e.estado_evento === "Activo" || e.estado_evento === "Planeado");
+    return slice(eventos.map(eventoToListItem));
+  }
+
+  return { view, total: 0, items: [] };
 }
 
 export const DashboardService = {
@@ -1174,7 +1410,7 @@ export const DashboardService = {
           evidencias: MOCK_ENTREGAS.length,
           bitacora_eventos: 15,
           cartas: 5,
-          historial_notificaciones: 8
+          ninos_fotos: MOCK_NINOS.length,
         },
         eventos_por_tabla: [
           { tabla: "api_nino", cantidad: 12 },
@@ -1191,9 +1427,294 @@ export const DashboardService = {
         ]
       };
     }
-    return fetchAPI<NoSQLStats>("/dashboard/nosql-stats/");
-  }
+    return fetchAPI<NoSQLStats>("/dashboard/nosql_stats/");
+  },
+
+  async getNoSQLContenido(
+    coleccion: NoSQLColeccion,
+    options?: { limit?: number; tipo?: string }
+  ): Promise<NoSQLContenidoResponse> {
+    if (USE_MOCK) {
+      await delay();
+      const now = new Date().toISOString();
+      if (coleccion === "evidencias") {
+        return {
+          coleccion,
+          total: 2,
+          items: [
+            {
+              _id: "mock-ev-1",
+              tipo: "foto",
+              url_archivo: "https://api.dicebear.com/7.x/thumbs/svg?seed=ev1",
+              entrega_id: 1,
+              nino_id: 1,
+              subido_por: "admin@smilelink.org",
+              timestamp: now,
+            },
+            {
+              _id: "mock-ev-2",
+              tipo: "foto",
+              url_archivo: "https://api.dicebear.com/7.x/thumbs/svg?seed=ev2",
+              entrega_id: 2,
+              nino_id: 2,
+              subido_por: "admin@smilelink.org",
+              timestamp: now,
+            },
+          ],
+        };
+      }
+      if (coleccion === "ninos_fotos") {
+        return {
+          coleccion,
+          total: MOCK_NINOS.length,
+          items: MOCK_NINOS.slice(0, 6).map((n, i) => ({
+            _id: `mock-foto-${i}`,
+            nino_id: Number(n.id_nino.replace(/\D/g, "")) || i + 1,
+            foto_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${n.nombre}`,
+          })),
+        };
+      }
+      if (coleccion === "cartas") {
+        return {
+          coleccion,
+          total: 2,
+          items: [
+            { _id: "mock-carta-1", nino_id: 1, apadrinamiento_id: 1, remitente: "Operador", timestamp: now },
+            { _id: "mock-carta-2", nino_id: 2, apadrinamiento_id: 2, remitente: "Operador", timestamp: now },
+          ],
+        };
+      }
+      return {
+        coleccion,
+        total: 3,
+        items: [
+          { _id: "mock-log-1", tabla: "api_nino", accion: "CREATE", usuario_id: 1, timestamp: now },
+          { _id: "mock-log-2", tabla: "api_entrega", accion: "UPDATE", usuario_id: 1, timestamp: now },
+          { _id: "mock-log-3", tabla: "api_padrino", accion: "LOGIN", usuario_id: 2, timestamp: now },
+        ],
+      };
+    }
+    const params = new URLSearchParams({ coleccion, limit: String(options?.limit ?? 50) });
+    if (options?.tipo) params.set("tipo", options.tipo);
+    try {
+      return await fetchAPI<NoSQLContenidoResponse>(`/dashboard/nosql_contenido/?${params.toString()}`);
+    } catch {
+      return loadNoSQLContenidoFallback(coleccion, options);
+    }
+  },
+
+  async getRelationalList(
+    view: string,
+    options?: { limit?: number }
+  ): Promise<RelationalListResponse> {
+    const limit = options?.limit ?? 300;
+
+    if (USE_MOCK) {
+      await delay();
+      const items = buildMockRelationalList(view, limit);
+      return { view, total: items.length, items };
+    }
+
+    const params = new URLSearchParams({
+      view,
+      limit: String(limit),
+    });
+    try {
+      return await fetchAPI<RelationalListResponse>(
+        `/dashboard/relational_list/?${params.toString()}`
+      );
+    } catch (err) {
+      if (!isNotFoundError(err)) throw err;
+      return loadRelationalListFallback(view, limit);
+    }
+  },
 };
+
+export type RelationalListItem = Record<string, unknown>;
+
+export interface RelationalListResponse {
+  view: string;
+  total: number;
+  items: RelationalListItem[];
+  _error?: string;
+}
+
+function buildMockRelationalList(view: string, limit: number): RelationalListItem[] {
+  const cap = <T>(arr: T[]) => arr.slice(0, limit);
+
+  if (view.startsWith("ninos_")) {
+    let list = MOCK_NINOS;
+    if (view === "ninos_disponibles") {
+      list = list.filter((n) => n.estado_apadrinamiento === "Disponible");
+    } else if (view === "ninos_apadrinados") {
+      list = list.filter((n) => n.estado_apadrinamiento === "Apadrinado");
+    }
+    return cap(list).map((n) => ({
+      id_nino: n.id_nino,
+      nombre: n.nombre,
+      edad: n.edad,
+      genero: n.genero,
+      estado_apadrinamiento: n.estado_apadrinamiento,
+    }));
+  }
+
+  if (view.startsWith("padrinos_")) {
+    let list = MOCK_PADRINOS;
+    if (view === "padrinos_activos") {
+      const activos = new Set(
+        MOCK_APADRINAMIENTOS.filter((a) => a.estado_apadrinamiento_registro === "Activo").map(
+          (a) => a.id_padrino
+        )
+      );
+      list = list.filter((p) => activos.has(p.id_padrino));
+    }
+    return cap(list).map((p) => ({
+      id_padrino: p.id_padrino,
+      nombre: p.nombre,
+      email: p.email,
+    }));
+  }
+
+  if (view.startsWith("apadrinamientos_")) {
+    let list = [...MOCK_APADRINAMIENTOS];
+    if (view === "apadrinamientos_activos") {
+      list = list.filter((a) => a.estado_apadrinamiento_registro === "Activo");
+    } else {
+      list.sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+    }
+    return cap(list).map((a) => {
+      const nino = MOCK_NINOS.find((n) => n.id_nino === a.id_nino);
+      const padrino = MOCK_PADRINOS.find((p) => p.id_padrino === a.id_padrino);
+      return {
+        id_apadrinamiento: a.id_apadrinamiento,
+        id_padrino: a.id_padrino,
+        id_nino: a.id_nino,
+        nino_nombre: nino?.nombre ?? a.id_nino,
+        padrino_nombre: padrino?.nombre ?? a.id_padrino,
+        estado_apadrinamiento_registro: a.estado_apadrinamiento_registro,
+        tipo_apadrinamiento: a.tipo_apadrinamiento,
+        fecha_inicio: a.fecha_inicio,
+      };
+    });
+  }
+
+  if (view.startsWith("entregas_")) {
+    let list = MOCK_ENTREGAS;
+    if (view === "entregas_completadas") {
+      list = list.filter((e) => e.estado_entrega === "Entregado");
+    } else if (view === "entregas_pendientes") {
+      list = list.filter((e) => e.estado_entrega === "Pendiente" || e.estado_entrega === "En Proceso");
+    }
+    return cap(list).map((e) => ({
+      id_entrega: e.id_entrega,
+      descripcion_regalo: e.descripcion_regalo,
+      fecha_programada: e.fecha_programada,
+      estado_entrega: e.estado_entrega,
+    }));
+  }
+
+  if (view === "solicitudes_abiertas") {
+    return cap(MOCK_SOLICITUDES.filter((s) => s.estado_solicitud === "Abierta")).map((s) => {
+      const nino = MOCK_NINOS.find((n) => n.id_nino === s.id_nino);
+      return {
+        id_solicitud: s.id_solicitud,
+        id_nino: s.id_nino,
+        nino_nombre: nino?.nombre ?? s.id_nino,
+        descripcion_solicitud: s.descripcion_solicitud,
+        estado_solicitud: s.estado_solicitud,
+      };
+    });
+  }
+
+  if (view === "eventos_activos") {
+    return cap(
+      MOCK_EVENTOS.filter((e) => e.estado_evento === "Activo" || e.estado_evento === "Planeado")
+    ).map((ev) => ({
+      id_evento: ev.id_evento,
+      nombre_evento: ev.nombre_evento,
+      tipo_evento: ev.tipo_evento,
+      fecha_inicio: ev.fecha_inicio,
+      estado_evento: ev.estado_evento,
+    }));
+  }
+
+  return [];
+}
+
+export function relationalItemsToNinos(items: RelationalListItem[]): Nino[] {
+  return items.map((item) => ({
+    id_nino: String(item.id_nino ?? ""),
+    nombre: String(item.nombre ?? ""),
+    edad: Number(item.edad ?? 0),
+    genero: (item.genero as Nino["genero"]) ?? "Masculino",
+    descripcion: "",
+    necesidades: [],
+    estado_apadrinamiento:
+      (item.estado_apadrinamiento as Nino["estado_apadrinamiento"]) ?? "Disponible",
+  }));
+}
+
+export function relationalItemsToPadrinos(items: RelationalListItem[]): Padrino[] {
+  return items.map((item) => ({
+    id_padrino: String(item.id_padrino ?? ""),
+    nombre: String(item.nombre ?? ""),
+    email: String(item.email ?? ""),
+    fecha_registro: "",
+    direccion: "",
+    telefono: "",
+    historial_apadrinamiento_ids: [],
+  }));
+}
+
+export function relationalItemsToApadrinamientos(items: RelationalListItem[]): Apadrinamiento[] {
+  return items.map((item) => ({
+    id_apadrinamiento: String(item.id_apadrinamiento ?? ""),
+    id_padrino: String(item.id_padrino ?? ""),
+    id_nino: String(item.id_nino ?? ""),
+    fecha_inicio: String(item.fecha_inicio ?? ""),
+    tipo_apadrinamiento:
+      (item.tipo_apadrinamiento as Apadrinamiento["tipo_apadrinamiento"]) ?? "Aleatorio",
+    estado_apadrinamiento_registro:
+      (item.estado_apadrinamiento_registro as Apadrinamiento["estado_apadrinamiento_registro"]) ??
+      "Activo",
+    entregas_ids: [],
+  }));
+}
+
+export function relationalItemsToEntregas(items: RelationalListItem[]): Entrega[] {
+  return items.map((item) => ({
+    id_entrega: String(item.id_entrega ?? ""),
+    id_apadrinamiento: "",
+    descripcion_regalo: String(item.descripcion_regalo ?? ""),
+    fecha_programada: String(item.fecha_programada ?? ""),
+    estado_entrega: (item.estado_entrega as Entrega["estado_entrega"]) ?? "Pendiente",
+    observaciones: "",
+    id_punto_entrega: "",
+  }));
+}
+
+export function relationalItemsToSolicitudes(items: RelationalListItem[]): SolicitudRegalo[] {
+  return items.map((item) => ({
+    id_solicitud: String(item.id_solicitud ?? ""),
+    id_nino: String(item.id_nino ?? ""),
+    descripcion_solicitud: String(item.descripcion_solicitud ?? ""),
+    fecha_solicitud: "",
+    estado_solicitud:
+      (item.estado_solicitud as SolicitudRegalo["estado_solicitud"]) ?? "Abierta",
+  }));
+}
+
+export function relationalItemsToEventos(items: RelationalListItem[]): Evento[] {
+  return items.map((item) => ({
+    id_evento: String(item.id_evento ?? ""),
+    nombre_evento: String(item.nombre_evento ?? ""),
+    tipo_evento: (item.tipo_evento as Evento["tipo_evento"]) ?? "Otro",
+    fecha_inicio: String(item.fecha_inicio ?? ""),
+    fecha_fin: "",
+    estado_evento: (item.estado_evento as Evento["estado_evento"]) ?? "Activo",
+    descripcion: "",
+  }));
+}
 
 export interface DiagnosticResult {
   mysql: {

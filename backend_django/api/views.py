@@ -997,6 +997,117 @@ class DashboardViewSet(viewsets.ViewSet):
             logger.error(f"Error al listar contenido NoSQL ({coleccion}): {e}")
             return Response({'coleccion': coleccion, 'total': 0, 'items': [], '_error': str(e)})
 
+    @action(detail=False, methods=['get'])
+    def relational_list(self, request):
+        """GET /api/dashboard/relational_list/?view=ninos_todos — listado MySQL ligero para drill-down."""
+        VISTAS = {
+            'ninos_todos', 'ninos_disponibles', 'ninos_apadrinados',
+            'padrinos_activos', 'padrinos_todos',
+            'apadrinamientos_activos', 'apadrinamientos_todos',
+            'entregas_completadas', 'entregas_pendientes', 'entregas_todas',
+            'solicitudes_abiertas', 'eventos_activos',
+        }
+        view = request.query_params.get('view', 'ninos_todos')
+        if view not in VISTAS:
+            return Response(
+                {'error': f'Vista inválida. Use: {", ".join(sorted(VISTAS))}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            limit = min(int(request.query_params.get('limit', 300)), 500)
+        except (TypeError, ValueError):
+            limit = 300
+
+        items = []
+
+        try:
+            if view.startswith('ninos_'):
+                qs = Nino.objects.filter(activo=True)
+                if view == 'ninos_disponibles':
+                    qs = qs.filter(estado_apadrinamiento='Disponible')
+                elif view == 'ninos_apadrinados':
+                    qs = qs.filter(estado_apadrinamiento='Apadrinado')
+                for n in qs.order_by('-id')[:limit]:
+                    items.append({
+                        'id_nino': n.pk,
+                        'nombre': descifrar_campo(n.nombre_cifrado),
+                        'edad': n.edad,
+                        'genero': n.genero,
+                        'estado_apadrinamiento': n.estado_apadrinamiento,
+                    })
+
+            elif view.startswith('padrinos_'):
+                qs = Padrino.objects.filter(activo=True)
+                if view == 'padrinos_activos':
+                    activo_ids = Apadrinamiento.objects.filter(
+                        estado_apadrinamiento_registro='Activo'
+                    ).values_list('id_padrino_id', flat=True).distinct()
+                    qs = qs.filter(pk__in=activo_ids)
+                for p in qs.order_by('-id')[:limit]:
+                    items.append({
+                        'id_padrino': p.pk,
+                        'nombre': descifrar_campo(p.nombre_cifrado),
+                        'email': p.email,
+                    })
+
+            elif view.startswith('apadrinamientos_'):
+                qs = Apadrinamiento.objects.select_related('id_padrino', 'id_nino').order_by('-id')
+                if view == 'apadrinamientos_activos':
+                    qs = qs.filter(estado_apadrinamiento_registro='Activo')
+                for a in qs[:limit]:
+                    items.append({
+                        'id_apadrinamiento': a.pk,
+                        'id_padrino': a.id_padrino_id,
+                        'id_nino': a.id_nino_id,
+                        'nino_nombre': descifrar_campo(a.id_nino.nombre_cifrado),
+                        'padrino_nombre': descifrar_campo(a.id_padrino.nombre_cifrado),
+                        'estado_apadrinamiento_registro': a.estado_apadrinamiento_registro,
+                        'tipo_apadrinamiento': a.tipo_apadrinamiento,
+                        'fecha_inicio': a.fecha_inicio.isoformat(),
+                    })
+
+            elif view.startswith('entregas_'):
+                qs = Entrega.objects.order_by('-id')
+                if view == 'entregas_completadas':
+                    qs = qs.filter(estado_entrega='Entregado')
+                elif view == 'entregas_pendientes':
+                    qs = qs.filter(estado_entrega__in=['Pendiente', 'En Proceso'])
+                for e in qs[:limit]:
+                    items.append({
+                        'id_entrega': e.pk,
+                        'descripcion_regalo': e.descripcion_regalo,
+                        'fecha_programada': e.fecha_programada.isoformat(),
+                        'estado_entrega': e.estado_entrega,
+                    })
+
+            elif view == 'solicitudes_abiertas':
+                qs = Solicitud.objects.filter(estado_solicitud='Abierta').select_related('id_nino').order_by('-id')
+                for s in qs[:limit]:
+                    items.append({
+                        'id_solicitud': s.pk,
+                        'id_nino': s.id_nino_id,
+                        'nino_nombre': descifrar_campo(s.id_nino.nombre_cifrado),
+                        'descripcion_solicitud': s.descripcion_solicitud,
+                        'estado_solicitud': s.estado_solicitud,
+                    })
+
+            elif view == 'eventos_activos':
+                qs = Evento.objects.filter(estado_evento__in=['Activo', 'Planeado']).order_by('fecha_inicio')
+                for ev in qs[:limit]:
+                    items.append({
+                        'id_evento': ev.pk,
+                        'nombre_evento': ev.nombre_evento,
+                        'tipo_evento': ev.tipo_evento,
+                        'fecha_inicio': ev.fecha_inicio.isoformat(),
+                        'estado_evento': ev.estado_evento,
+                    })
+
+            return Response({'view': view, 'total': len(items), 'items': items})
+
+        except Exception as e:
+            logger.error(f"Error en relational_list ({view}): {e}")
+            return Response({'view': view, 'total': 0, 'items': [], '_error': str(e)})
+
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
