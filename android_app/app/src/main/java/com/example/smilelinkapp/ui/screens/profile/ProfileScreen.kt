@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.smilelinkapp.config.AppConfig
 import com.example.smilelinkapp.data.local.SessionManager
+import com.example.smilelinkapp.data.repository.SmileLinkRepository
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,11 +28,23 @@ fun ProfileScreen(
     val context = LocalContext.current
     val sessionManager = remember { SessionManager(context) }
     val padrino = sessionManager.getPadrino()
+    val repository = remember { SmileLinkRepository() }
+    val coroutineScope = rememberCoroutineScope()
     
     val padrinoName = padrino?.nombre ?: "Usuario"
     val padrinoEmail = padrino?.email ?: "email@example.com"
     val padrinoDireccion = padrino?.direccion ?: "No especificada"
     val padrinoTelefono = padrino?.telefono ?: "No especificado"
+
+    var nameState by remember { mutableStateOf(padrinoName) }
+    var addressState by remember { mutableStateOf(padrinoDireccion) }
+    var phoneState by remember { mutableStateOf(padrinoTelefono) }
+
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editName by remember { mutableStateOf("") }
+    var editAddress by remember { mutableStateOf("") }
+    var editPhone by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
     
     Scaffold(
         topBar = {
@@ -64,7 +78,7 @@ fun ProfileScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 AsyncImage(
-                    model = "https://ui-avatars.com/api/?name=$padrinoName&size=256&background=0077BE&color=fff",
+                    model = "https://ui-avatars.com/api/?name=$nameState&size=256&background=0077BE&color=fff",
                     contentDescription = "Foto de perfil",
                     modifier = Modifier
                         .size(120.dp)
@@ -73,7 +87,7 @@ fun ProfileScreen(
                 )
                 
                 Text(
-                    text = padrinoName,
+                    text = nameState,
                     style = MaterialTheme.typography.headlineMedium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -98,21 +112,36 @@ fun ProfileScreen(
                 icon = Icons.Default.Person,
                 title = "Editar Perfil",
                 subtitle = "Actualiza tu información personal",
-                onClick = { /* TODO */ }
+                onClick = {
+                    editName = nameState
+                    editAddress = if (addressState == "No especificada") "" else addressState
+                    editPhone = if (phoneState == "No especificado") "" else phoneState
+                    showEditDialog = true
+                }
             )
             
             ProfileMenuItem(
                 icon = Icons.Default.LocationOn,
                 title = "Dirección",
-                subtitle = padrinoDireccion,
-                onClick = { /* TODO */ }
+                subtitle = addressState,
+                onClick = {
+                    editName = nameState
+                    editAddress = if (addressState == "No especificada") "" else addressState
+                    editPhone = if (phoneState == "No especificado") "" else phoneState
+                    showEditDialog = true
+                }
             )
             
             ProfileMenuItem(
                 icon = Icons.Default.Phone,
                 title = "Teléfono",
-                subtitle = padrinoTelefono,
-                onClick = { /* TODO */ }
+                subtitle = phoneState,
+                onClick = {
+                    editName = nameState
+                    editAddress = if (addressState == "No especificada") "" else addressState
+                    editPhone = if (phoneState == "No especificado") "" else phoneState
+                    showEditDialog = true
+                }
             )
             
             Divider()
@@ -128,14 +157,18 @@ fun ProfileScreen(
                 icon = Icons.Default.Notifications,
                 title = "Notificaciones",
                 subtitle = "Gestiona tus notificaciones",
-                onClick = { /* TODO */ }
+                onClick = {
+                    android.widget.Toast.makeText(context, "Configuración de notificaciones próximamente", android.widget.Toast.LENGTH_SHORT).show()
+                }
             )
             
             ProfileMenuItem(
                 icon = Icons.Default.Lock,
                 title = "Privacidad y Seguridad",
                 subtitle = "Controla tu privacidad",
-                onClick = { /* TODO */ }
+                onClick = {
+                    android.widget.Toast.makeText(context, "Configuración de privacidad próximamente", android.widget.Toast.LENGTH_SHORT).show()
+                }
             )
             
             // Development mode indicator
@@ -185,14 +218,18 @@ fun ProfileScreen(
                 icon = Icons.Default.Info,
                 title = "Acerca de SmileLink",
                 subtitle = "Versión 1.0.0",
-                onClick = { /* TODO */ }
+                onClick = {
+                    android.widget.Toast.makeText(context, "SmileLink v1.0.0", android.widget.Toast.LENGTH_SHORT).show()
+                }
             )
             
             ProfileMenuItem(
                 icon = Icons.Default.Settings,
                 title = "Ayuda y Soporte",
                 subtitle = "¿Necesitas ayuda?",
-                onClick = { /* TODO */ }
+                onClick = {
+                    android.widget.Toast.makeText(context, "Soporte: soporte@smilelink.org", android.widget.Toast.LENGTH_LONG).show()
+                }
             )
             
             // Logout button
@@ -217,6 +254,97 @@ fun ProfileScreen(
                 Text("Cerrar Sesión")
             }
         }
+    }
+
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isSaving) showEditDialog = false },
+            title = { Text("Editar Perfil") },
+            text = {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("Nombre") },
+                        enabled = !isSaving,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editAddress,
+                        onValueChange = { editAddress = it },
+                        label = { Text("Dirección") },
+                        enabled = !isSaving,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editPhone,
+                        onValueChange = { editPhone = it },
+                        label = { Text("Teléfono") },
+                        enabled = !isSaving,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (editName.isBlank()) {
+                            android.widget.Toast.makeText(context, "El nombre es requerido", android.widget.Toast.LENGTH_SHORT).show()
+                            return@Button
+                        }
+                        coroutineScope.launch {
+                            isSaving = true
+                            val originalPadrino = sessionManager.getPadrino()
+                            if (originalPadrino != null) {
+                                val updatedPadrino = originalPadrino.copy(
+                                    nombre = editName,
+                                    direccion = editAddress,
+                                    telefono = editPhone
+                                )
+                                val result = repository.updatePadrino(originalPadrino.idPadrino, updatedPadrino)
+                                if (result.isSuccess) {
+                                    val savedPadrino = result.getOrNull() ?: updatedPadrino
+                                    sessionManager.saveSession(savedPadrino)
+                                    nameState = savedPadrino.nombre
+                                    addressState = savedPadrino.direccion ?: "No especificada"
+                                    phoneState = savedPadrino.telefono ?: "No especificado"
+                                    showEditDialog = false
+                                    android.widget.Toast.makeText(context, "Perfil actualizado con éxito", android.widget.Toast.LENGTH_SHORT).show()
+                                } else {
+                                    val errorMsg = result.exceptionOrNull()?.message ?: "Error al conectar con el servidor"
+                                    android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                android.widget.Toast.makeText(context, "Error de sesión", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                            isSaving = false
+                        }
+                    },
+                    enabled = !isSaving
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Guardar")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEditDialog = false },
+                    enabled = !isSaving
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 

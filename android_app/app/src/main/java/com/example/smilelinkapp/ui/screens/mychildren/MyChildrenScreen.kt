@@ -33,6 +33,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.example.smilelinkapp.ui.theme.SuccessGreen
 import com.example.smilelinkapp.ui.theme.WarningOrange
 import android.content.Intent
+import kotlinx.coroutines.launch
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,6 +44,7 @@ fun MyChildrenScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var selectedDeliveryId by remember { mutableStateOf<String?>(null) }
     var isUploading by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
@@ -180,13 +182,82 @@ fun MyChildrenScreen(
                                     previewImageModel = model
                                 },
                                 onShareDelivery = { entrega, childName ->
-                                    val sendIntent: Intent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        putExtra(Intent.EXTRA_TEXT, "¡Hola! Te comparto que la entrega del regalo (${entrega.descripcionRegalo}) para mi ahijado/a $childName ya se encuentra registrada como: ${entrega.estadoEntrega}.")
-                                        type = "text/plain"
+                                    coroutineScope.launch {
+                                        val firstPhoto = entrega.evidenciasNosql?.firstOrNull { it.tipo == "foto" }
+                                        val photoUrl = if (firstPhoto != null) {
+                                            val apiBase = com.example.smilelinkapp.config.AppConfig.BASE_URL
+                                            val serverBase = if (apiBase.endsWith("/api/")) apiBase.substringBefore("/api/") else "http://10.66.207.165:8000"
+                                            "${serverBase}/${firstPhoto.urlArchivo}"
+                                        } else {
+                                            null
+                                        }
+
+                                        val shareText = "¡Hola! Te comparto que la entrega del regalo (${entrega.descripcionRegalo}) para mi ahijado/a $childName ya se encuentra registrada como: ${entrega.estadoEntrega}."
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                        }
+
+                                        if (photoUrl != null) {
+                                            try {
+                                                val imageLoader = coil.ImageLoader(context)
+                                                val request = coil.request.ImageRequest.Builder(context)
+                                                    .data(photoUrl)
+                                                    .build()
+                                                val result = imageLoader.execute(request)
+                                                
+                                                if (result is coil.request.SuccessResult) {
+                                                    val drawable = result.drawable
+                                                    val bitmap = if (drawable is android.graphics.drawable.BitmapDrawable) {
+                                                        drawable.bitmap
+                                                    } else {
+                                                        val w = drawable.intrinsicWidth.coerceAtLeast(1)
+                                                        val h = drawable.intrinsicHeight.coerceAtLeast(1)
+                                                        val b = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+                                                        val canvas = android.graphics.Canvas(b)
+                                                        drawable.setBounds(0, 0, w, h)
+                                                        drawable.draw(canvas)
+                                                        b
+                                                    }
+
+                                                    val cacheFile = java.io.File(context.cacheDir, "shared_evidence_${entrega.idEntrega}.jpg")
+                                                    java.io.FileOutputStream(cacheFile).use { out ->
+                                                        bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                                                    }
+
+                                                    val contentUri = androidx.core.content.FileProvider.getUriForFile(
+                                                        context,
+                                                        "com.example.smilelinkapp.fileprovider",
+                                                        cacheFile
+                                                    )
+
+                                                    sendIntent.apply {
+                                                        putExtra(Intent.EXTRA_STREAM, contentUri)
+                                                        putExtra(Intent.EXTRA_TEXT, shareText)
+                                                        type = "image/jpeg"
+                                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                } else {
+                                                    sendIntent.apply {
+                                                        putExtra(Intent.EXTRA_TEXT, "$shareText\n\nEvidencia: $photoUrl")
+                                                        type = "text/plain"
+                                                    }
+                                                }
+                                            } catch (e: Exception) {
+                                                sendIntent.apply {
+                                                    putExtra(Intent.EXTRA_TEXT, "$shareText\n\nEvidencia: $photoUrl")
+                                                    type = "text/plain"
+                                                }
+                                            }
+                                        } else {
+                                            sendIntent.apply {
+                                                putExtra(Intent.EXTRA_TEXT, shareText)
+                                                type = "text/plain"
+                                            }
+                                        }
+
+                                        val shareIntent = Intent.createChooser(sendIntent, null)
+                                        context.startActivity(shareIntent)
                                     }
-                                    val shareIntent = Intent.createChooser(sendIntent, null)
-                                    context.startActivity(shareIntent)
                                 }
                             )
                         }

@@ -272,7 +272,16 @@ class PadrinosViewSet(viewsets.ViewSet):
 
         padrino.save()
         registrar_bitacora(padrino.pk, 'api_padrino', 'UPDATE', {})
-        return Response({'id': padrino.pk, 'mensaje': 'Padrino actualizado'})
+        return Response({
+            'id':              padrino.pk,
+            'nombre':          descifrar_campo(padrino.nombre_cifrado),
+            'email':           padrino.email,
+            'telefono':        descifrar_campo(padrino.telefono_cifrado),
+            'direccion':       descifrar_campo(padrino.direccion_cifrada),
+            'id_google_auth':  padrino.id_google_auth,
+            'fecha_registro':  str(padrino.fecha_registro),
+            'activo':          padrino.activo,
+        })
 
     def destroy(self, request, pk=None):
         """DELETE /api/padrinos/{id}/ — soft delete."""
