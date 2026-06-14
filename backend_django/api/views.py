@@ -860,11 +860,10 @@ class DashboardViewSet(viewsets.ViewSet):
                     return 0
 
             counts = {
-                'evidencias':               safe_count('evidencias'),
-                'bitacora_eventos':         safe_count('bitacora_eventos'),
-                'cartas':                   safe_count('cartas'),
-                'historial_notificaciones': safe_count('historial_notificaciones'),
-                'ninos_fotos':              safe_count('ninos_fotos'),
+                'evidencias':       safe_count('evidencias'),
+                'bitacora_eventos': safe_count('bitacora_eventos'),
+                'cartas':           safe_count('cartas'),
+                'ninos_fotos':      safe_count('ninos_fotos'),
             }
 
             # ── Eventos por Tabla ────────────────────────────────────────────
@@ -955,7 +954,7 @@ class DashboardViewSet(viewsets.ViewSet):
             return Response({
                 'documentos_totales': {
                     'evidencias': 0, 'bitacora_eventos': 0,
-                    'cartas': 0, 'historial_notificaciones': 0,
+                    'cartas': 0, 'ninos_fotos': 0,
                 },
                 'eventos_por_tabla':   [
                     {"tabla": "api_nino", "cantidad": 15},
@@ -971,6 +970,32 @@ class DashboardViewSet(viewsets.ViewSet):
                 ],
                 '_error': str(e),
             })
+
+    @action(detail=False, methods=['get'])
+    def nosql_contenido(self, request):
+        """GET /api/dashboard/nosql_contenido/?coleccion=evidencias — drill-down del dashboard NoSQL."""
+        from .mongo_client import listar_contenido_nosql
+
+        coleccion = request.query_params.get('coleccion', 'evidencias')
+        permitidas = {'evidencias', 'ninos_fotos', 'cartas', 'bitacora_eventos'}
+        if coleccion not in permitidas:
+            return Response(
+                {'error': f'Colección inválida. Use: {", ".join(sorted(permitidas))}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            limit = int(request.query_params.get('limit', 50))
+        except (TypeError, ValueError):
+            limit = 50
+
+        tipo = request.query_params.get('tipo') or None
+        try:
+            items = listar_contenido_nosql(coleccion, limit=limit, tipo=tipo)
+            return Response({'coleccion': coleccion, 'total': len(items), 'items': items})
+        except Exception as e:
+            logger.error(f"Error al listar contenido NoSQL ({coleccion}): {e}")
+            return Response({'coleccion': coleccion, 'total': 0, 'items': [], '_error': str(e)})
 
 
 from rest_framework.decorators import api_view, permission_classes

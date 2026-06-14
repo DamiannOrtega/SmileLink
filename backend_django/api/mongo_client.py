@@ -225,3 +225,57 @@ def obtener_fotos_ninos(nino_ids: list) -> dict:
     return {doc['nino_id']: doc.get('foto_url', '') for doc in cursor}
 
 
+def _serialize_doc(doc: dict) -> dict:
+    """Convierte ObjectId y datetime a formatos JSON-serializables."""
+    if not doc:
+        return doc
+    if '_id' in doc:
+        doc['_id'] = str(doc['_id'])
+    if 'timestamp' in doc and doc['timestamp']:
+        doc['timestamp'] = doc['timestamp'].isoformat()
+    return doc
+
+
+def listar_contenido_nosql(coleccion: str, limit: int = 50, tipo: str = None) -> list:
+    """
+    Lista documentos recientes de una colección NoSQL para drill-down del dashboard.
+
+    Args:
+        coleccion: evidencias | ninos_fotos | cartas | bitacora_eventos
+        limit:     máximo de documentos (1–100)
+        tipo:      filtro opcional para evidencias (foto, video, documento)
+    """
+    db = get_mongo_db()
+    limit = max(1, min(int(limit), 100))
+
+    if coleccion == 'evidencias':
+        filt = {}
+        if tipo:
+            import re
+            filt['tipo'] = {'$regex': f'^{re.escape(tipo)}$', '$options': 'i'}
+        projection = {
+            '_id': 1, 'tipo': 1, 'url_archivo': 1, 'entrega_id': 1,
+            'nino_id': 1, 'subido_por': 1, 'timestamp': 1,
+        }
+        cursor = db.evidencias.find(filt, projection).sort('timestamp', -1).limit(limit)
+    elif coleccion == 'ninos_fotos':
+        projection = {'_id': 1, 'nino_id': 1, 'foto_url': 1}
+        cursor = db.ninos_fotos.find({}, projection).limit(limit)
+    elif coleccion == 'cartas':
+        projection = {
+            '_id': 1, 'nino_id': 1, 'apadrinamiento_id': 1,
+            'remitente': 1, 'timestamp': 1,
+        }
+        cursor = db.cartas.find({}, projection).sort('timestamp', -1).limit(limit)
+    elif coleccion == 'bitacora_eventos':
+        projection = {
+            '_id': 1, 'tabla': 1, 'accion': 1,
+            'usuario_id': 1, 'timestamp': 1,
+        }
+        cursor = db.bitacora_eventos.find({}, projection).sort('timestamp', -1).limit(limit)
+    else:
+        return []
+
+    return [_serialize_doc(dict(doc)) for doc in cursor]
+
+
