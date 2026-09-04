@@ -304,7 +304,7 @@ def admin_login(request):
     Body: { email, password }
     Autentica encargados/administradores del sistema usando la tabla api_administrador.
     """
-    email    = request.data.get('email', '').lower().strip()
+    email    = request.data.get('email', '').strip()
     password = request.data.get('password', '')
 
     if not email or not password:
@@ -313,11 +313,13 @@ def admin_login(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    try:
-        admin = Administrador.objects.get(email=email)
-    except Administrador.DoesNotExist:
+    admin = Administrador.objects.filter(email__iexact=email).first()
+    if not admin:
+        admin = Administrador.objects.filter(email__icontains=email).first()
+
+    if not admin:
         return Response(
-            {'error': 'Credenciales incorrectas'},
+            {'error': f'No existe ningún administrador registrado con el correo: {email}'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
@@ -334,7 +336,7 @@ def admin_login(request):
         except Exception:
             pass
         return Response(
-            {'error': 'Credenciales incorrectas'},
+            {'error': 'La contraseña ingresada es incorrecta.'},
             status=status.HTTP_401_UNAUTHORIZED
         )
 
