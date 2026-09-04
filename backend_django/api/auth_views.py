@@ -329,8 +329,14 @@ def admin_login(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
+    print(f"[DEBUG LOGIN] Email recibido: {repr(email)}")
+    print(f"[DEBUG LOGIN] Password recibido: {repr(password)}")
+    print(f"[DEBUG LOGIN] Hash en BD: {repr(admin.password_hash)[:30]}")
+    es_valida = check_password(password, admin.password_hash)
+    print(f"[DEBUG LOGIN] ¿Es valida?: {es_valida}")
+
     # Verificar contraseña con Django check_password (soporta PBKDF2)
-    if not check_password(password, admin.password_hash):
+    if not es_valida:
         try:
             registrar_bitacora(admin.pk, 'api_administrador', 'ADMIN_LOGIN_FAILED', {'email': email})
         except Exception:
