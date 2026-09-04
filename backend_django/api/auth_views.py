@@ -15,7 +15,7 @@ import re
 import logging
 from datetime import datetime, timedelta, timezone
 
-from api.models import Padrino
+from api.models import Padrino, Administrador
 from utils.encryption import cifrar_campo, descifrar_campo
 from api.mongo_client import registrar_bitacora
 
@@ -35,6 +35,19 @@ def generar_jwt(padrino: Padrino) -> str:
         'email':      padrino.email,
         'exp':        datetime.now(timezone.utc) + timedelta(hours=settings.JWT_EXPIRATION_HOURS),
         'iat':        datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def generar_jwt_admin(admin: Administrador) -> str:
+    """Genera un token JWT para el Administrador."""
+    payload = {
+        'admin_id': admin.pk,
+        'email':    admin.email,
+        'rol':      admin.rol,
+        'nombre':   admin.nombre,
+        'exp':      datetime.now(timezone.utc) + timedelta(hours=settings.JWT_EXPIRATION_HOURS),
+        'iat':      datetime.now(timezone.utc),
     }
     return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -278,3 +291,71 @@ def google_login(request):
         'nuevo':   created,
         'padrino': _padrino_to_dict(padrino),
     })
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LOGIN DE ADMINISTRADORES
+# ──────────────────────────────────────────────────────────────────────────────
+
+@api_view(['POST'])
+def admin_login(request):
+    """
+    POST /api/auth/admin-login/
+    Body: { email, password }
+    Autentica encargados/administradores del sistema usando la tabla api_administrador.
+    """
+    email    = request.data.get('email', '').lower().strip()
+    password = request.data.get('password', '')
+
+    if not email or not password:
+        return Response(
+            {'error': 'Email y contraseña son requeridos'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        admin = Administrador.objects.get(email=email)
+    except Administrador.DoesNotExist:
+        return Response(
+            {'error': 'Credenciales incorrectas'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    if not admin.activo:
+        return Response(
+            {'error': 'Cuenta inactiva. Contacta al administrador del sistema.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    # Verificar contraseña con Django check_password (soporta PBKDF2)
+    if not check_password(password, admin.password_hash):
+        try:
+            registrar_bitacora(admin.pk, 'api_administrador', 'ADMIN_LOGIN_FAILED', {'email': email})
+        except Exception:
+            pass
+        return Response(
+            {'error': 'Credenciales incorrectas'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    # Registrar login exitoso en bitácora
+    try:
+        registrar_bitacora(admin.pk, 'api_administrador', 'ADMIN_LOGIN', {'email': email, 'rol': admin.rol})
+    except Exception as e:
+        logger.warning(f"No se pudo registrar en bitácora MongoDB: {e}")
+
+    token = generar_jwt_admin(admin)
+
+    return Response(
+        {
+            'message': 'Inicio de sesión exitoso',
+            'token':   token,
+            'admin': {
+                'id':     admin.pk,
+                'nombre': admin.nombre,
+                'email':  admin.email,
+                'rol':    admin.rol,
+            },
+        },
+        status=status.HTTP_200_OK
+    )

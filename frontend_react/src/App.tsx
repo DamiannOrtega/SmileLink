@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "./components/layouts/AdminLayout";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Ninos from "./pages/Ninos";
@@ -39,38 +40,44 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Ruta pública — Login */}
           <Route path="/login" element={<Login />} />
+
+          {/* Redirigir raíz a dashboard */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<AdminLayout><Dashboard /></AdminLayout>} />
-          <Route path="/ninos" element={<AdminLayout><Ninos /></AdminLayout>} />
-          <Route path="/ninos/nuevo" element={<AdminLayout><NinoNuevo /></AdminLayout>} />
-          <Route path="/ninos/:id" element={<AdminLayout><NinoDetalle /></AdminLayout>} />
-          <Route path="/ninos/:id/editar" element={<AdminLayout><NinoNuevo /></AdminLayout>} />
-          <Route path="/padrinos" element={<AdminLayout><Padrinos /></AdminLayout>} />
-          <Route path="/padrinos/nuevo" element={<AdminLayout><PadrinoNuevo /></AdminLayout>} />
-          <Route path="/padrinos/:id" element={<AdminLayout><PadrinoDetalle /></AdminLayout>} />
-          <Route path="/padrinos/:id/editar" element={<AdminLayout><PadrinoNuevo /></AdminLayout>} />
-          <Route path="/asignaciones" element={<AdminLayout><Asignaciones /></AdminLayout>} />
-          <Route path="/asignaciones/nueva" element={<AdminLayout><AsignacionNueva /></AdminLayout>} />
-          <Route path="/asignaciones/:id" element={<AdminLayout><AsignacionDetalle /></AdminLayout>} />
-          <Route path="/asignaciones/:id/editar" element={<AdminLayout><AsignacionNueva /></AdminLayout>} />
-          <Route path="/cartas" element={<AdminLayout><Cartas /></AdminLayout>} />
-          <Route path="/cartas/nueva" element={<AdminLayout><CartaNueva /></AdminLayout>} />
-          <Route path="/cartas/:id" element={<AdminLayout><CartaDetalle /></AdminLayout>} />
-          <Route path="/cartas/:id/editar" element={<AdminLayout><CartaNueva /></AdminLayout>} />
-          <Route path="/regalos" element={<AdminLayout><Regalos /></AdminLayout>} />
-          <Route path="/entregas" element={<AdminLayout><Entregas /></AdminLayout>} />
-          <Route path="/ubicaciones" element={<AdminLayout><Ubicaciones /></AdminLayout>} />
-          <Route path="/ubicaciones/nueva" element={<AdminLayout><UbicacionNueva /></AdminLayout>} />
-          <Route path="/ubicaciones/:id" element={<AdminLayout><UbicacionDetalle /></AdminLayout>} />
-          <Route path="/ubicaciones/:id/editar" element={<AdminLayout><UbicacionNueva /></AdminLayout>} />
-          <Route path="/eventos" element={<AdminLayout><Eventos /></AdminLayout>} />
-          <Route path="/eventos/nuevo" element={<AdminLayout><EventoNuevo /></AdminLayout>} />
-          <Route path="/eventos/:id/editar" element={<AdminLayout><EventoNuevo /></AdminLayout>} />
-          <Route path="/usuarios" element={<AdminLayout><Usuarios /></AdminLayout>} />
-          <Route path="/usuarios/nuevo" element={<AdminLayout><UsuarioNuevo /></AdminLayout>} />
-          <Route path="/usuarios/:id/editar" element={<AdminLayout><UsuarioNuevo /></AdminLayout>} />
-          <Route path="/configuracion" element={<AdminLayout><Configuracion /></AdminLayout>} />
+
+          {/* Rutas protegidas — requieren sesión activa */}
+          <Route path="/dashboard" element={<ProtectedRoute><AdminLayout><Dashboard /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ninos" element={<ProtectedRoute><AdminLayout><Ninos /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ninos/nuevo" element={<ProtectedRoute><AdminLayout><NinoNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ninos/:id" element={<ProtectedRoute><AdminLayout><NinoDetalle /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ninos/:id/editar" element={<ProtectedRoute><AdminLayout><NinoNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/padrinos" element={<ProtectedRoute><AdminLayout><Padrinos /></AdminLayout></ProtectedRoute>} />
+          <Route path="/padrinos/nuevo" element={<ProtectedRoute><AdminLayout><PadrinoNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/padrinos/:id" element={<ProtectedRoute><AdminLayout><PadrinoDetalle /></AdminLayout></ProtectedRoute>} />
+          <Route path="/padrinos/:id/editar" element={<ProtectedRoute><AdminLayout><PadrinoNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/asignaciones" element={<ProtectedRoute><AdminLayout><Asignaciones /></AdminLayout></ProtectedRoute>} />
+          <Route path="/asignaciones/nueva" element={<ProtectedRoute><AdminLayout><AsignacionNueva /></AdminLayout></ProtectedRoute>} />
+          <Route path="/asignaciones/:id" element={<ProtectedRoute><AdminLayout><AsignacionDetalle /></AdminLayout></ProtectedRoute>} />
+          <Route path="/asignaciones/:id/editar" element={<ProtectedRoute><AdminLayout><AsignacionNueva /></AdminLayout></ProtectedRoute>} />
+          <Route path="/cartas" element={<ProtectedRoute><AdminLayout><Cartas /></AdminLayout></ProtectedRoute>} />
+          <Route path="/cartas/nueva" element={<ProtectedRoute><AdminLayout><CartaNueva /></AdminLayout></ProtectedRoute>} />
+          <Route path="/cartas/:id" element={<ProtectedRoute><AdminLayout><CartaDetalle /></AdminLayout></ProtectedRoute>} />
+          <Route path="/cartas/:id/editar" element={<ProtectedRoute><AdminLayout><CartaNueva /></AdminLayout></ProtectedRoute>} />
+          <Route path="/regalos" element={<ProtectedRoute><AdminLayout><Regalos /></AdminLayout></ProtectedRoute>} />
+          <Route path="/entregas" element={<ProtectedRoute><AdminLayout><Entregas /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ubicaciones" element={<ProtectedRoute><AdminLayout><Ubicaciones /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ubicaciones/nueva" element={<ProtectedRoute><AdminLayout><UbicacionNueva /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ubicaciones/:id" element={<ProtectedRoute><AdminLayout><UbicacionDetalle /></AdminLayout></ProtectedRoute>} />
+          <Route path="/ubicaciones/:id/editar" element={<ProtectedRoute><AdminLayout><UbicacionNueva /></AdminLayout></ProtectedRoute>} />
+          <Route path="/eventos" element={<ProtectedRoute><AdminLayout><Eventos /></AdminLayout></ProtectedRoute>} />
+          <Route path="/eventos/nuevo" element={<ProtectedRoute><AdminLayout><EventoNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/eventos/:id/editar" element={<ProtectedRoute><AdminLayout><EventoNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/usuarios" element={<ProtectedRoute><AdminLayout><Usuarios /></AdminLayout></ProtectedRoute>} />
+          <Route path="/usuarios/nuevo" element={<ProtectedRoute><AdminLayout><UsuarioNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/usuarios/:id/editar" element={<ProtectedRoute><AdminLayout><UsuarioNuevo /></AdminLayout></ProtectedRoute>} />
+          <Route path="/configuracion" element={<ProtectedRoute><AdminLayout><Configuracion /></AdminLayout></ProtectedRoute>} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
