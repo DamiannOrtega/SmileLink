@@ -10,12 +10,13 @@ class Administrador(models.Model):
     """Administradores del sistema (Gestor o Superadmin)."""
     ROL_CHOICES = [('Gestor', 'Gestor'), ('Superadmin', 'Superadmin')]
 
-    nombre     = models.CharField(max_length=200)
-    email      = models.EmailField(unique=True)
-    rol        = models.CharField(max_length=20, choices=ROL_CHOICES, default='Gestor')
-    activo     = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    nombre        = models.CharField(max_length=200)
+    email         = models.EmailField(unique=True)
+    rol           = models.CharField(max_length=20, choices=ROL_CHOICES, default='Gestor')
+    activo        = models.BooleanField(default=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+    password_hash = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         db_table = 'api_administrador'

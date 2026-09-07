@@ -9,7 +9,7 @@ from .views import (
     EventosViewSet, AdministradoresViewSet, DashboardViewSet,
     diagnostics_check
 )
-from .auth_views import register, login, logout, get_current_user, google_login
+from .auth_views import register, login, logout, get_current_user, google_login, admin_login
 
 router = DefaultRouter()
 router.register(r'ninos',           NinosViewSet,           basename='nino')
@@ -28,10 +28,13 @@ urlpatterns = [
     # ── Diagnósticos
     path('diagnostics/check/', diagnostics_check, name='diagnostics-check'),
 
-    # ── Autenticación
-    path('auth/register/', register,         name='auth-register'),
-    path('auth/login/',    login,            name='auth-login'),
-    path('auth/logout/',   logout,           name='auth-logout'),
-    path('auth/me/',       get_current_user, name='auth-me'),
-    path('auth/google/',   google_login,     name='auth-google'),
+    # ── Autenticación (Padrinos)
+    path('auth/register/',    register,         name='auth-register'),
+    path('auth/login/',       login,            name='auth-login'),
+    path('auth/logout/',      logout,           name='auth-logout'),
+    path('auth/me/',          get_current_user, name='auth-me'),
+    path('auth/google/',      google_login,     name='auth-google'),
+
+    # ── Autenticación (Administradores)
+    path('auth/admin-login/', admin_login,      name='auth-admin-login'),
 ]
