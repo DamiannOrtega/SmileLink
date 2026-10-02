@@ -3,6 +3,9 @@ SmileLink API — Views
 ViewSets completos usando ORM Django (MySQL) + MongoDB para datos semiestructurados.
 Todos los campos sensibles se cifran/descifran con Fernet antes de persistir.
 """
+import jwt
+from datetime import datetime, timezone
+from django.conf import settings
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,6 +17,24 @@ from .models import (
     Administrador, Padrino, Nino, PuntoEntrega,
     Evento, Apadrinamiento, Entrega, Solicitud
 )
+
+
+def _get_authenticated_padrino(request):
+    """Extrae el objeto Padrino si la petición proviene de un padrino autenticado."""
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.startswith('Bearer '):
+        token = auth_header.split(' ')[1]
+        try:
+            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            padrino_id = payload.get('padrino_id')
+            if padrino_id:
+                return Padrino.objects.filter(pk=padrino_id).first()
+        except Exception:
+            pass
+    padrino_id = request.query_params.get('padrino_id')
+    if padrino_id:
+        return Padrino.objects.filter(pk=padrino_id).first()
+    return None
 from .serializers import (
     AdministradorSerializer,
     PadrinoSerializer, PadrinoListSerializer,
@@ -52,6 +73,15 @@ class NinosViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """GET /api/ninos/ — lista todos los niños activos."""
+        padrino = _get_authenticated_padrino(request)
+        if padrino and not padrino.puede_apadrinar:
+            return Response({
+                'error': 'Debes verificar tu identidad con tu INE y foto de rostro para tener acceso a los niños.',
+                'puede_apadrinar': False,
+                'estado_verificacion': padrino.estado_verificacion,
+                'motivo_rechazo': padrino.motivo_rechazo or ''
+            }, status=status.HTTP_403_FORBIDDEN)
+
         estado = request.query_params.get('estado')
         qs = Nino.objects.filter(activo=True)
         if estado:
@@ -70,6 +100,15 @@ class NinosViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         """GET /api/ninos/{id}/ — detalle con nombre descifrado."""
+        padrino = _get_authenticated_padrino(request)
+        if padrino and not padrino.puede_apadrinar:
+            return Response({
+                'error': 'Debes verificar tu identidad con tu INE y foto de rostro para tener acceso a los niños.',
+                'puede_apadrinar': False,
+                'estado_verificacion': padrino.estado_verificacion,
+                'motivo_rechazo': padrino.motivo_rechazo or ''
+            }, status=status.HTTP_403_FORBIDDEN)
+
         try:
             nino = Nino.objects.get(pk=pk, activo=True)
         except Nino.DoesNotExist:
@@ -175,6 +214,15 @@ class NinosViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def disponibles(self, request):
         """GET /api/ninos/disponibles/ — niños listos para apadrinar."""
+        padrino = _get_authenticated_padrino(request)
+        if padrino and not padrino.puede_apadrinar:
+            return Response({
+                'error': 'Debes verificar tu identidad con tu INE y foto de rostro para ver los niños disponibles.',
+                'puede_apadrinar': False,
+                'estado_verificacion': padrino.estado_verificacion,
+                'motivo_rechazo': padrino.motivo_rechazo or ''
+            }, status=status.HTTP_403_FORBIDDEN)
+
         ninos = Nino.objects.filter(estado_apadrinamiento='Disponible', activo=True)
 
         from .mongo_client import obtener_fotos_ninos
@@ -201,9 +249,15 @@ class PadrinosViewSet(viewsets.ViewSet):
     """
 
     def list(self, request):
-        """GET /api/padrinos/"""
-        padrinos = Padrino.objects.filter(activo=True)
-        serializer = PadrinoListSerializer(padrinos, many=True)
+        """GET /api/padrinos/ — soporte de filtros por estado_verificacion y puede_apadrinar."""
+        qs = Padrino.objects.filter(activo=True)
+        estado_verif = request.query_params.get('estado_verificacion')
+        if estado_verif:
+            qs = qs.filter(estado_verificacion=estado_verif)
+        puede_ap = request.query_params.get('puede_apadrinar')
+        if puede_ap is not None:
+            qs = qs.filter(puede_apadrinar=puede_ap.lower() in ['true', '1'])
+        serializer = PadrinoListSerializer(qs, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -212,19 +266,40 @@ class PadrinosViewSet(viewsets.ViewSet):
             padrino = Padrino.objects.get(pk=pk)
         except Padrino.DoesNotExist:
             return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Intentar obtener fragmento vertical sensible (dirección) desde Supabase
+        direccion = descifrar_campo(padrino.direccion_cifrada)
+        try:
+            from .supabase_client import obtener_fragmento_padrino
+            frag = obtener_fragmento_padrino(padrino.pk)
+            if frag and frag.get('direccion_cifrada'):
+                dir_desc = descifrar_campo(frag['direccion_cifrada'].encode('latin1', errors='ignore'))
+                if dir_desc and dir_desc != '[CIFRADO]':
+                    direccion = dir_desc
+        except Exception:
+            pass
+
         return Response({
-            'id':              padrino.pk,
-            'nombre':          descifrar_campo(padrino.nombre_cifrado),
-            'email':           padrino.email,
-            'telefono':        descifrar_campo(padrino.telefono_cifrado),
-            'direccion':       descifrar_campo(padrino.direccion_cifrada),
-            'id_google_auth':  padrino.id_google_auth,
-            'fecha_registro':  str(padrino.fecha_registro),
-            'activo':          padrino.activo,
+            'id':                  padrino.pk,
+            'nombre':              descifrar_campo(padrino.nombre_cifrado),
+            'email':               padrino.email,
+            'telefono':            descifrar_campo(padrino.telefono_cifrado),
+            'direccion':           direccion,
+            'id_google_auth':      padrino.id_google_auth,
+            'fecha_registro':      str(padrino.fecha_registro),
+            'activo':              padrino.activo,
+            'puede_apadrinar':     padrino.puede_apadrinar,
+            'estado_verificacion': padrino.estado_verificacion,
+            'motivo_rechazo':      padrino.motivo_rechazo or '',
+            'foto_ine_path':       padrino.foto_ine_path or '',
+            'foto_rostro_path':    padrino.foto_rostro_path or '',
+            'ia_sospecha':         padrino.ia_sospecha,
+            'ia_reporte':          padrino.ia_reporte or {},
+            'fecha_verificacion':  str(padrino.fecha_verificacion) if padrino.fecha_verificacion else None,
         })
 
     def create(self, request):
-        """POST /api/padrinos/ — crear padrino con campos cifrados."""
+        """POST /api/padrinos/ — crear padrino con campos cifrados y fragmentación en Supabase."""
         data    = request.data
         nombre  = data.get('nombre', '').strip()
         email   = data.get('email', '').lower().strip()
@@ -235,19 +310,34 @@ class PadrinosViewSet(viewsets.ViewSet):
             return Response({'error': 'Este email ya está registrado'}, status=status.HTTP_400_BAD_REQUEST)
 
         password = data.get('password', '')
+        direccion_raw = data.get('direccion', '')
+        direccion_cifrada_bytes = cifrar_campo(direccion_raw)
+
         padrino = Padrino(
             nombre_cifrado    = cifrar_campo(nombre),
             email             = email,
             telefono_cifrado  = cifrar_campo(data.get('telefono', '')),
-            direccion_cifrada = cifrar_campo(data.get('direccion', '')),
+            direccion_cifrada = direccion_cifrada_bytes,
             id_google_auth    = data.get('id_google_auth'),
             password_hash     = make_password(password) if password else '',
+            puede_apadrinar   = False,
+            estado_verificacion = 'Pendiente',
         )
         try:
             padrino.save()
         except Exception as e:
             logger.error(f"Error al crear padrino: {e}")
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fragmentación vertical: sincronizar dirección sensible a Supabase
+        try:
+            from .supabase_client import guardar_fragmento_padrino
+            guardar_fragmento_padrino(
+                id_padrino=padrino.pk,
+                direccion_cifrada_str=direccion_cifrada_bytes.decode('latin1', errors='ignore') if direccion_cifrada_bytes else ''
+            )
+        except Exception as e:
+            logger.warning(f"No se pudo guardar fragmento en Supabase: {e}")
 
         registrar_bitacora(padrino.pk, 'api_padrino', 'CREATE', {'email': email})
         return Response({'id': padrino.pk, 'mensaje': 'Padrino registrado correctamente'},
@@ -267,20 +357,30 @@ class PadrinosViewSet(viewsets.ViewSet):
             padrino.telefono_cifrado = cifrar_campo(data['telefono'])
         if 'direccion' in data:
             padrino.direccion_cifrada = cifrar_campo(data['direccion'])
+            try:
+                from .supabase_client import guardar_fragmento_padrino
+                guardar_fragmento_padrino(
+                    id_padrino=padrino.pk,
+                    direccion_cifrada_str=padrino.direccion_cifrada.decode('latin1', errors='ignore')
+                )
+            except Exception:
+                pass
         if 'activo' in data:
             padrino.activo = data['activo']
 
         padrino.save()
         registrar_bitacora(padrino.pk, 'api_padrino', 'UPDATE', {})
         return Response({
-            'id':              padrino.pk,
-            'nombre':          descifrar_campo(padrino.nombre_cifrado),
-            'email':           padrino.email,
-            'telefono':        descifrar_campo(padrino.telefono_cifrado),
-            'direccion':       descifrar_campo(padrino.direccion_cifrada),
-            'id_google_auth':  padrino.id_google_auth,
-            'fecha_registro':  str(padrino.fecha_registro),
-            'activo':          padrino.activo,
+            'id':                  padrino.pk,
+            'nombre':              descifrar_campo(padrino.nombre_cifrado),
+            'email':               padrino.email,
+            'telefono':            descifrar_campo(padrino.telefono_cifrado),
+            'direccion':           descifrar_campo(padrino.direccion_cifrada),
+            'id_google_auth':      padrino.id_google_auth,
+            'fecha_registro':      str(padrino.fecha_registro),
+            'activo':              padrino.activo,
+            'puede_apadrinar':     padrino.puede_apadrinar,
+            'estado_verificacion': padrino.estado_verificacion,
         })
 
     def destroy(self, request, pk=None):
@@ -292,6 +392,204 @@ class PadrinosViewSet(viewsets.ViewSet):
         padrino.activo = False
         padrino.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['post'], url_path='subir-identificacion')
+    def subir_identificacion(self, request, pk=None):
+        """
+        POST /api/padrinos/{id}/subir-identificacion/
+        Multipart form:
+          - foto_ine: Archivo de fotografía de la credencial INE.
+          - foto_rostro: Archivo de fotografía del rostro / selfie.
+        Analiza metadatos con IA detector, sube a Supabase y pone estado en 'Pendiente'.
+        """
+        try:
+            padrino = Padrino.objects.get(pk=pk)
+        except Padrino.DoesNotExist:
+            return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        from utils.image_analysis import analizar_imagen_ia
+        from .supabase_client import subir_archivo_identificacion, guardar_fragmento_padrino
+
+        foto_ine = request.FILES.get('foto_ine')
+        foto_rostro = request.FILES.get('foto_rostro')
+
+        if not foto_ine and not foto_rostro:
+            return Response(
+                {'error': 'Debes enviar al menos una fotografía (foto_ine o foto_rostro)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        reporte_ia = padrino.ia_reporte or {}
+        ia_detectada = False
+
+        # 1. Procesar y analizar Foto INE
+        if foto_ine:
+            ine_bytes = foto_ine.read()
+            analisis_ine = analizar_imagen_ia(ine_bytes, foto_ine.name)
+            reporte_ia['ine'] = analisis_ine
+            if analisis_ine['es_sospechosa_ia']:
+                ia_detectada = True
+
+            ine_path = f"padrinos/{padrino.pk}/ine_{int(datetime.now().timestamp())}.jpg"
+            subido = subir_archivo_identificacion(
+                ine_path, ine_bytes, content_type=foto_ine.content_type or 'image/jpeg'
+            )
+            if subido:
+                padrino.foto_ine_path = ine_path
+            else:
+                # Almacenar referencia interna
+                padrino.foto_ine_path = ine_path
+
+        # 2. Procesar y analizar Foto Rostro
+        if foto_rostro:
+            rostro_bytes = foto_rostro.read()
+            analisis_rostro = analizar_imagen_ia(rostro_bytes, foto_rostro.name)
+            reporte_ia['rostro'] = analisis_rostro
+            if analisis_rostro['es_sospechosa_ia']:
+                ia_detectada = True
+
+            rostro_path = f"padrinos/{padrino.pk}/rostro_{int(datetime.now().timestamp())}.jpg"
+            subido = subir_archivo_identificacion(
+                rostro_path, rostro_bytes, content_type=foto_rostro.content_type or 'image/jpeg'
+            )
+            if subido:
+                padrino.foto_rostro_path = rostro_path
+            else:
+                padrino.foto_rostro_path = rostro_path
+
+        padrino.ia_sospecha = ia_detectada
+        padrino.ia_reporte = reporte_ia
+        padrino.estado_verificacion = 'Pendiente'
+        padrino.motivo_rechazo = ''  # Limpiar motivo de rechazo previo al reintentar
+        padrino.save()
+
+        # Sincronizar en Supabase fragmento sensible
+        try:
+            guardar_fragmento_padrino(
+                id_padrino=padrino.pk,
+                direccion_cifrada_str=padrino.direccion_cifrada.decode('latin1', errors='ignore') if padrino.direccion_cifrada else '',
+                foto_ine_path=padrino.foto_ine_path,
+                foto_rostro_path=padrino.foto_rostro_path,
+                ia_sospecha=padrino.ia_sospecha,
+                ia_reporte=padrino.ia_reporte
+            )
+        except Exception as e:
+            logger.warning(f"Error sincronizando fragmento en Supabase: {e}")
+
+        # Notificar en bitácora
+        registrar_bitacora(padrino.pk, 'api_padrino', 'UPLOAD_VERIFICATION_PHOTOS', {
+            'ia_sospecha': ia_detectada,
+            'ine_subida': bool(foto_ine),
+            'rostro_subido': bool(foto_rostro)
+        })
+
+        return Response({
+            'mensaje': 'Fotografías subidas correctamente y puestas en revisión por el administrador.',
+            'estado_verificacion': padrino.estado_verificacion,
+            'ia_sospecha': padrino.ia_sospecha,
+            'ia_reporte': padrino.ia_reporte,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'], url_path='verificacion')
+    def verificacion(self, request, pk=None):
+        """
+        GET /api/padrinos/{id}/verificacion/
+        Genera URLs firmadas temporales para que el administrador examine
+        la INE y la selfie con privacidad absoluta.
+        """
+        try:
+            padrino = Padrino.objects.get(pk=pk)
+        except Padrino.DoesNotExist:
+            return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        from .supabase_client import generar_url_firmada
+
+        foto_ine_url = generar_url_firmada(padrino.foto_ine_path, expires_in=3600) if padrino.foto_ine_path else ''
+        foto_rostro_url = generar_url_firmada(padrino.foto_rostro_path, expires_in=3600) if padrino.foto_rostro_path else ''
+
+        return Response({
+            'padrino_id':          padrino.pk,
+            'nombre':              descifrar_campo(padrino.nombre_cifrado),
+            'email':               padrino.email,
+            'puede_apadrinar':     padrino.puede_apadrinar,
+            'estado_verificacion': padrino.estado_verificacion,
+            'motivo_rechazo':      padrino.motivo_rechazo or '',
+            'foto_ine_url':        foto_ine_url,
+            'foto_rostro_url':     foto_rostro_url,
+            'ia_sospecha':         padrino.ia_sospecha,
+            'ia_reporte':          padrino.ia_reporte or {},
+            'fecha_verificacion':  str(padrino.fecha_verificacion) if padrino.fecha_verificacion else None,
+        })
+
+    @action(detail=True, methods=['post'], url_path='resolver-verificacion')
+    def resolver_verificacion(self, request, pk=None):
+        """
+        POST /api/padrinos/{id}/resolver-verificacion/
+        Body:
+          - accion: "aprobar" | "rechazar" | "solicitar_reintento"
+          - motivo: "Explicación / mensaje al padrino (obligatorio si solicita reintento o rechaza)"
+        """
+        try:
+            padrino = Padrino.objects.get(pk=pk)
+        except Padrino.DoesNotExist:
+            return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+
+        data = request.data
+        accion = data.get('accion', '').lower().strip()
+        motivo = data.get('motivo', '').strip()
+
+        if accion not in ['aprobar', 'rechazar', 'solicitar_reintento']:
+            return Response(
+                {'error': "La acción debe ser: 'aprobar', 'rechazar' o 'solicitar_reintento'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if accion in ['rechazar', 'solicitar_reintento'] and not motivo:
+            return Response(
+                {'error': "Debes proporcionar un motivo o indicación para el padrino."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        now = datetime.now(timezone.utc)
+        padrino.fecha_verificacion = now
+
+        if accion == 'aprobar':
+            padrino.puede_apadrinar = True
+            padrino.estado_verificacion = 'Aprobado'
+            padrino.motivo_rechazo = ''
+            msg_notif = "¡Tu identidad ha sido verificada exitosamente! Ya puedes apadrinar niños en SmileLink."
+        elif accion == 'rechazar':
+            padrino.puede_apadrinar = False
+            padrino.estado_verificacion = 'Rechazado'
+            padrino.motivo_rechazo = motivo
+            msg_notif = f"Tu solicitud de apadrinamiento fue denegada: {motivo}"
+        else: # solicitar_reintento
+            padrino.puede_apadrinar = False
+            padrino.estado_verificacion = 'Requiere_Reintento'
+            padrino.motivo_rechazo = motivo
+            msg_notif = f"Por favor vuelve a tomar tu fotografía de identificación o rostro: {motivo}"
+
+        padrino.save()
+
+        # Registrar notificación push en MongoDB para la app móvil
+        try:
+            registrar_notificacion(padrino.pk, 'VERIFICACION_IDENTIDAD', msg_notif, enviado=True)
+        except Exception as e:
+            logger.warning(f"No se pudo registrar notificación en MongoDB: {e}")
+
+        # Registrar acción del admin en bitácora MongoDB
+        registrar_bitacora(padrino.pk, 'api_padrino', f'VERIFICACION_{accion.upper()}', {
+            'accion': accion,
+            'motivo': motivo,
+        })
+
+        return Response({
+            'mensaje': f'Verificación actualizada a {padrino.estado_verificacion}',
+            'id': padrino.pk,
+            'puede_apadrinar': padrino.puede_apadrinar,
+            'estado_verificacion': padrino.estado_verificacion,
+            'motivo_rechazo': padrino.motivo_rechazo,
+        }, status=status.HTTP_200_OK)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -335,6 +633,14 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
             return Response({'error': 'Niño no encontrado'}, status=status.HTTP_404_NOT_FOUND)
         except KeyError as e:
             return Response({'error': f'Campo requerido: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not padrino.puede_apadrinar:
+            return Response({
+                'error': 'No puedes apadrinar niños hasta que un administrador apruebe tu identificación oficial (INE) y fotografía de rostro.',
+                'puede_apadrinar': False,
+                'estado_verificacion': padrino.estado_verificacion,
+                'motivo_rechazo': padrino.motivo_rechazo or ''
+            }, status=status.HTTP_403_FORBIDDEN)
 
         ap = Apadrinamiento(
             id_padrino              = padrino,

@@ -116,7 +116,16 @@ MONGODB_PASS = os.getenv('MONGODB_PASS', '')
 # Generar con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # ==============================================================================
 
-FERNET_KEY = os.getenv('FERNET_KEY', '')
+FERNET_KEY = os.getenv('FERNET_KEY', '').strip()
+if FERNET_KEY.startswith('FERNET_KEY='):
+    FERNET_KEY = FERNET_KEY.split('=', 1)[1].strip()
+
+# ==============================================================================
+# FRAGMENTACIÓN VERTICAL — SUPABASE (Nube: Datos sensibles, dirección e imágenes)
+# ==============================================================================
+SUPABASE_URL = os.getenv('SUPABASE_URL', '').replace('/rest/v1/', '').rstrip('/')
+SUPABASE_SERVICE_ROLE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+SUPABASE_BUCKET_IDENTIFICACIONES = os.getenv('SUPABASE_BUCKET_IDENTIFICACIONES', 'identificaciones').strip()
 
 
 # ==============================================================================

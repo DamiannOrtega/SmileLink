@@ -53,6 +53,9 @@ class PadrinoSerializer(serializers.ModelSerializer):
             'direccion', 'direccion_input',
             'password',
             'id_google_auth', 'fecha_registro', 'activo',
+            'puede_apadrinar', 'estado_verificacion', 'motivo_rechazo',
+            'foto_ine_path', 'foto_rostro_path',
+            'ia_sospecha', 'ia_reporte', 'fecha_verificacion',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'fecha_registro', 'created_at', 'updated_at']
@@ -68,12 +71,15 @@ class PadrinoSerializer(serializers.ModelSerializer):
 
 
 class PadrinoListSerializer(serializers.ModelSerializer):
-    """Versión liviana para listados (sin descifrar todos los campos)."""
+    """Versión liviana para listados (con estado de verificación y autorización)."""
     nombre = serializers.SerializerMethodField()
 
     class Meta:
         model  = Padrino
-        fields = ['id', 'nombre', 'email', 'activo', 'fecha_registro']
+        fields = [
+            'id', 'nombre', 'email', 'activo', 'fecha_registro',
+            'puede_apadrinar', 'estado_verificacion', 'ia_sospecha', 'motivo_rechazo'
+        ]
 
     def get_nombre(self, obj):
         return descifrar_campo(obj.nombre_cifrado)

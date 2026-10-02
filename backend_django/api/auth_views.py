@@ -55,14 +55,20 @@ def generar_jwt_admin(admin: Administrador) -> str:
 def _padrino_to_dict(padrino: Padrino) -> dict:
     """Convierte un Padrino a dict con campos descifrados (sin password_hash)."""
     return {
-        'id':             padrino.pk,
-        'nombre':         descifrar_campo(padrino.nombre_cifrado),
-        'email':          padrino.email,
-        'telefono':       descifrar_campo(padrino.telefono_cifrado),
-        'direccion':      descifrar_campo(padrino.direccion_cifrada),
-        'id_google_auth': padrino.id_google_auth,
-        'fecha_registro': str(padrino.fecha_registro),
-        'activo':         padrino.activo,
+        'id':                  padrino.pk,
+        'nombre':              descifrar_campo(padrino.nombre_cifrado),
+        'email':               padrino.email,
+        'telefono':            descifrar_campo(padrino.telefono_cifrado),
+        'direccion':           descifrar_campo(padrino.direccion_cifrada),
+        'id_google_auth':      padrino.id_google_auth,
+        'fecha_registro':      str(padrino.fecha_registro),
+        'activo':              padrino.activo,
+        'puede_apadrinar':     padrino.puede_apadrinar,
+        'estado_verificacion': padrino.estado_verificacion,
+        'motivo_rechazo':      padrino.motivo_rechazo or '',
+        'foto_ine_path':       padrino.foto_ine_path or '',
+        'foto_rostro_path':    padrino.foto_rostro_path or '',
+        'ia_sospecha':         padrino.ia_sospecha,
     }
 
 
@@ -114,6 +120,17 @@ def register(request):
     except Exception as e:
         logger.error(f"Error al registrar padrino: {e}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    # Guardar fragmento vertical sensible (dirección) en Supabase
+    try:
+        from api.supabase_client import guardar_fragmento_padrino
+        cifrado_bytes = cifrar_campo(direccion)
+        guardar_fragmento_padrino(
+            id_padrino=padrino.pk,
+            direccion_cifrada_str=cifrado_bytes.decode('latin1', errors='ignore') if cifrado_bytes else ''
+        )
+    except Exception as e:
+        logger.warning(f"No se pudo sincronizar fragmento con Supabase: {e}")
 
     # Registrar en bitácora MongoDB
     try:

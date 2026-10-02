@@ -45,6 +45,24 @@ class Padrino(models.Model):
     # Contraseña (Django PBKDF2+salt — no SHA-256 manual)
     password_hash     = models.CharField(max_length=255, blank=True, default='')
 
+    # VERIFICACIÓN DE IDENTIDAD Y APADRINAMIENTO (Fragmentación Vertical / Supabase)
+    puede_apadrinar      = models.BooleanField(default=False)
+    ESTADO_VERIF_CHOICES = [
+        ('Pendiente',          'Pendiente'),
+        ('Aprobado',           'Aprobado'),
+        ('Rechazado',          'Rechazado'),
+        ('Requiere_Reintento', 'Requiere Reintento'),
+    ]
+    estado_verificacion  = models.CharField(
+        max_length=25, choices=ESTADO_VERIF_CHOICES, default='Pendiente'
+    )
+    motivo_rechazo       = models.TextField(blank=True, default='')
+    foto_ine_path        = models.CharField(max_length=255, blank=True, default='')
+    foto_rostro_path     = models.CharField(max_length=255, blank=True, default='')
+    ia_sospecha          = models.BooleanField(default=False)
+    ia_reporte           = models.JSONField(default=dict, blank=True)
+    fecha_verificacion   = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         db_table = 'api_padrino'
 

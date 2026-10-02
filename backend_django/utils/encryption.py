@@ -28,7 +28,9 @@ def _get_fernet() -> Fernet:
             " y agrégala al .env"
         )
     if isinstance(key, str):
-        key = key.encode()
+        if key.startswith('FERNET_KEY='):
+            key = key.split('=', 1)[1]
+        key = key.strip().encode()
     return Fernet(key)
 
 
