@@ -22,6 +22,14 @@ export interface Padrino {
   direccion: string;
   telefono: string;
   historial_apadrinamiento_ids: string[]; // FKs to Apadrinamiento
+  puede_apadrinar?: boolean;
+  estado_verificacion?: "Pendiente" | "Aprobado" | "Rechazado" | "Requiere_Reintento";
+  motivo_rechazo?: string;
+  foto_ine_path?: string;
+  foto_rostro_path?: string;
+  ia_sospecha?: boolean;
+  ia_reporte?: any;
+  fecha_verificacion?: string;
 }
 
 export interface Nino {
@@ -472,7 +480,7 @@ const normNino = (n: any): Nino => ({
 });
 
 const normPadrino = (p: any): Padrino => ({
-  id_padrino: String(p.id),
+  id_padrino: String(p.id ?? p.id_padrino ?? ""),
   nombre: p.nombre || '',
   email: p.email,
   telefono: p.telefono || '',
@@ -480,6 +488,14 @@ const normPadrino = (p: any): Padrino => ({
   fecha_registro: p.fecha_registro || '',
   id_google_auth: p.id_google_auth ?? undefined,
   historial_apadrinamiento_ids: [], // Se obtiene por separado si se necesita
+  puede_apadrinar: Boolean(p.puede_apadrinar),
+  estado_verificacion: p.estado_verificacion || 'Pendiente',
+  motivo_rechazo: p.motivo_rechazo || '',
+  foto_ine_path: p.foto_ine_path || '',
+  foto_rostro_path: p.foto_rostro_path || '',
+  ia_sospecha: Boolean(p.ia_sospecha),
+  ia_reporte: p.ia_reporte || {},
+  fecha_verificacion: p.fecha_verificacion || undefined,
 });
 
 const normApadrinamiento = (a: any): Apadrinamiento => ({
@@ -683,6 +699,69 @@ export const PadrinosService = {
       return;
     }
     return fetchAPI<void>(`/padrinos/${id}/`, { method: "DELETE" });
+  },
+
+  async getVerificacion(id: string): Promise<{
+    padrino_id: number;
+    nombre: string;
+    email: string;
+    puede_apadrinar: boolean;
+    estado_verificacion: "Pendiente" | "Aprobado" | "Rechazado" | "Requiere_Reintento";
+    motivo_rechazo: string;
+    foto_ine_url: string;
+    foto_rostro_url: string;
+    ia_sospecha: boolean;
+    ia_reporte: any;
+    fecha_verificacion: string | null;
+  }> {
+    if (USE_MOCK) {
+      await delay();
+      const p = MOCK_PADRINOS.find((x) => x.id_padrino === id);
+      return {
+        padrino_id: Number(id.replace(/\D/g, '')) || 1,
+        nombre: p?.nombre || "Padrino Demo",
+        email: p?.email || "padrino@demo.com",
+        puede_apadrinar: p?.puede_apadrinar || false,
+        estado_verificacion: p?.estado_verificacion || "Pendiente",
+        motivo_rechazo: p?.motivo_rechazo || "",
+        foto_ine_url: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80",
+        foto_rostro_url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop&q=80",
+        ia_sospecha: p?.ia_sospecha || false,
+        ia_reporte: p?.ia_reporte || {},
+        fecha_verificacion: p?.fecha_verificacion || null,
+      };
+    }
+    return fetchAPI<any>(`/padrinos/${id}/verificacion/`);
+  },
+
+  async resolverVerificacion(
+    id: string,
+    data: { accion: "aprobar" | "rechazar" | "solicitar_reintento"; motivo?: string }
+  ): Promise<any> {
+    if (USE_MOCK) {
+      await delay();
+      const p = MOCK_PADRINOS.find((x) => x.id_padrino === id);
+      if (p) {
+        if (data.accion === "aprobar") {
+          p.puede_apadrinar = true;
+          p.estado_verificacion = "Aprobado";
+          p.motivo_rechazo = "";
+        } else if (data.accion === "rechazar") {
+          p.puede_apadrinar = false;
+          p.estado_verificacion = "Rechazado";
+          p.motivo_rechazo = data.motivo || "";
+        } else {
+          p.puede_apadrinar = false;
+          p.estado_verificacion = "Requiere_Reintento";
+          p.motivo_rechazo = data.motivo || "";
+        }
+      }
+      return { mensaje: "Verificación procesada con éxito", estado_verificacion: p?.estado_verificacion };
+    }
+    return fetchAPI<any>(`/padrinos/${id}/resolver-verificacion/`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   },
 };
 
