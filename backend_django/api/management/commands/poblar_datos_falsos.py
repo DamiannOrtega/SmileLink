@@ -100,14 +100,21 @@ class Command(BaseCommand):
             ("Zapopan", 20.7167, -103.4000),
             ("León", 21.1221, -101.6826),
         ]
+        colonias_mexico = [
+            "Centro", "San Marcos", "Campestre", "Las Américas", "Del Valle",
+            "Polanco", "Roma Norte", "Providencia", "Santa Anita", "Jardines",
+            "El Cedazo", "Morelos", "Gobernadores", "Bosques", "Héroes", "Altavista"
+        ]
+
         puntos = []
         for i in range(1, 41):
             ciudad, base_lat, base_lng = random.choice(ciudades)
             lat = round(base_lat + random.uniform(-0.05, 0.05), 7)
             lng = round(base_lng + random.uniform(-0.05, 0.05), 7)
+            colonia = random.choice(colonias_mexico)
             punto = PuntoEntrega.objects.create(
                 nombre_punto=f"Centro Comunitario {fake.street_name()} #{i}",
-                direccion_fisica=f"{fake.street_address()}, Col. {fake.neighborhood()}, {ciudad}",
+                direccion_fisica=f"{fake.street_address()}, Col. {colonia}, {ciudad}",
                 latitud=lat,
                 longitud=lng,
                 horario_atencion="Lunes a Viernes 09:00 - 18:00",
@@ -179,7 +186,8 @@ class Command(BaseCommand):
             nombre_plano = fake.name()
             email = f"padrino{i}@smilelink.org"
             telefono_plano = f"449{random.randint(1000000, 9999999)}"
-            direccion_plana = f"Av. {fake.street_name()} #{random.randint(100, 2500)}, Col. {fake.neighborhood()}, Aguascalientes, Ags."
+            colonia = random.choice(colonias_mexico)
+            direccion_plana = f"Av. {fake.street_name()} #{random.randint(100, 2500)}, Col. {colonia}, Aguascalientes, Ags."
 
             direccion_cifrada_bytes = cifrar_campo(direccion_plana)
 
