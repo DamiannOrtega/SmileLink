@@ -48,15 +48,32 @@ class Command(BaseCommand):
         Faker.seed(2026)
         random.seed(2026)
 
-        # 1. Limpiar tablas existentes en orden de dependencias
-        self.stdout.write("1. Vaciando tablas relacionales...")
+        # 1. Limpiar tablas existentes y asegurar columnas de verificación en MySQL
+        self.stdout.write("1. Verificando estructura de MySQL y vaciando tablas...")
         with connection.cursor() as cursor:
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
+
+            # Asegurar que las columnas nuevas de verificación e IA existan en api_padrino
+            cursor.execute("SHOW COLUMNS FROM `api_padrino` LIKE 'puede_apadrinar';")
+            if not cursor.fetchone():
+                self.stdout.write(self.style.WARNING("   -> Creando columnas de verificación en tabla api_padrino..."))
+                cursor.execute("""
+                    ALTER TABLE `api_padrino`
+                    ADD COLUMN `puede_apadrinar` TINYINT(1) NOT NULL DEFAULT 0,
+                    ADD COLUMN `estado_verificacion` VARCHAR(25) NOT NULL DEFAULT 'Pendiente',
+                    ADD COLUMN `motivo_rechazo` LONGTEXT NULL,
+                    ADD COLUMN `foto_ine_path` VARCHAR(255) NOT NULL DEFAULT '',
+                    ADD COLUMN `foto_rostro_path` VARCHAR(255) NOT NULL DEFAULT '',
+                    ADD COLUMN `ia_sospecha` TINYINT(1) NOT NULL DEFAULT 0,
+                    ADD COLUMN `ia_reporte` JSON NULL,
+                    ADD COLUMN `fecha_verificacion` DATETIME(6) NULL;
+                """)
+
             for model in [Solicitud, Entrega, Apadrinamiento, Nino, Padrino, Evento, PuntoEntrega, Administrador]:
                 table_name = model._meta.db_table
                 cursor.execute(f"TRUNCATE TABLE `{table_name}`;")
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
-        self.stdout.write(self.style.SUCCESS("   ✔ Tablas vaciadas exitosamente."))
+        self.stdout.write(self.style.SUCCESS("   ✔ Columnas verificadas y tablas vaciadas exitosamente."))
 
         # 2. Administradores (Cuentas clave para pruebas)
         self.stdout.write("2. Creando Administradores...")
