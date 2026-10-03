@@ -11,16 +11,23 @@ Colecciones usadas:
 from pymongo import MongoClient
 from django.conf import settings
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
 _client = None
+
+# Cache en memoria para NoSQL stats del dashboard (evita queries repetidas)
+_nosql_stats_cache = None
+_nosql_stats_cache_ts = 0.0
+NOSQL_STATS_TTL = 60  # segundos
 
 
 def get_mongo_db():
     """
     Retorna la instancia de base de datos MongoDB (patrón singleton).
     La conexión se crea una sola vez y se reutiliza.
+    Timeouts ajustados para no bloquear la UI si MongoDB está lento.
     """
     global _client
     if _client is None:
@@ -29,9 +36,24 @@ def get_mongo_db():
             f"@{settings.MONGODB_HOST}:{settings.MONGODB_PORT}/"
             f"?authSource=admin"
         )
-        _client = MongoClient(uri, serverSelectionTimeoutMS=5000)
+        _client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=1500,  # Máx 1.5s para seleccionar servidor
+            connectTimeoutMS=1500,           # Máx 1.5s para establecer conexión
+            socketTimeoutMS=3000,            # Máx 3s por operación de socket
+        )
         logger.info(f"MongoDB client creado → {settings.MONGODB_HOST}:{settings.MONGODB_PORT}")
     return _client[settings.MONGODB_DB]
+
+
+def is_mongo_available() -> bool:
+    """Verifica rápidamente si MongoDB está disponible (ping con timeout corto)."""
+    try:
+        db = get_mongo_db()
+        db.command("ping")
+        return True
+    except Exception:
+        return False
 
 
 # ──────────────────────────────────────────────────────────────────────────────

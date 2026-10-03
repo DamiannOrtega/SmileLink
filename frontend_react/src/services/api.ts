@@ -407,52 +407,60 @@ const delay = (ms: number = 500): Promise<void> => {
  * Maneja automáticamente las respuestas paginadas de Django REST Framework
  * (que retornan {count, next, previous, results:[...]})
  */
-async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
+async function fetchAPI<T>(endpoint: string, options?: RequestInit, timeoutMs = 8000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!response.ok) {
-    let message = `HTTP Error ${response.status}: ${response.statusText}`;
-    try {
-      const errBody = await response.json();
-      if (typeof errBody?.error === "string") {
-        message = errBody.error;
-      } else if (errBody && typeof errBody === "object") {
-        message = Object.entries(errBody)
-          .map(([key, value]) => {
-            const text = Array.isArray(value) ? value.join(", ") : String(value);
-            return `${key}: ${text}`;
-          })
-          .join("; ");
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+      signal: controller.signal,
+      ...options,
+    });
+
+    if (!response.ok) {
+      let message = `HTTP Error ${response.status}: ${response.statusText}`;
+      try {
+        const errBody = await response.json();
+        if (typeof errBody?.error === "string") {
+          message = errBody.error;
+        } else if (errBody && typeof errBody === "object") {
+          message = Object.entries(errBody)
+            .map(([key, value]) => {
+              const text = Array.isArray(value) ? value.join(", ") : String(value);
+              return `${key}: ${text}`;
+            })
+            .join("; ");
+        }
+      } catch {
+        // Mantener mensaje HTTP genérico
       }
-    } catch {
-      // Mantener mensaje HTTP genérico
+      throw new Error(message);
     }
-    throw new Error(message);
-  }
 
-  if (response.status === 204) {
-    return null as unknown as T;
-  }
+    if (response.status === 204) {
+      return null as unknown as T;
+    }
 
-  const text = await response.text();
-  if (!text) {
-    return null as unknown as T;
-  }
-  const data = JSON.parse(text);
+    const text = await response.text();
+    if (!text) {
+      return null as unknown as T;
+    }
+    const data = JSON.parse(text);
 
-  // Django REST Framework retorna respuestas paginadas: {count, next, previous, results:[...]}
-  // El frontend espera arrays directos, así que extraemos .results si existe
-  if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
-    return data.results as T;
-  }
+    // Django REST Framework retorna respuestas paginadas: {count, next, previous, results:[...]}
+    // El frontend espera arrays directos, así que extraemos .results si existe
+    if (data && typeof data === "object" && "results" in data && Array.isArray(data.results)) {
+      return data.results as T;
+    }
 
-  return data as T;
+    return data as T;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function ensureArray<T>(value: unknown): T[] {

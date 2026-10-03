@@ -83,19 +83,29 @@ class NinosViewSet(viewsets.ViewSet):
             }, status=status.HTTP_403_FORBIDDEN)
 
         estado = request.query_params.get('estado')
-        qs = Nino.objects.filter(activo=True)
+        qs = Nino.objects.filter(activo=True).only(
+            'id', 'nombre_cifrado', 'edad', 'genero',
+            'estado_apadrinamiento', 'id_padrino_actual', 'fecha_apadrinamiento_actual', 'activo'
+        )
         if estado:
             qs = qs.filter(estado_apadrinamiento=estado)
 
-        from .mongo_client import obtener_fotos_ninos
-        nino_ids = [n.pk for n in qs]
-        try:
-            fotos_dict = obtener_fotos_ninos(nino_ids)
-        except Exception as e:
-            logger.warning(f"No se pudieron pre-cargar las fotos de niños desde MongoDB: {e}")
-            fotos_dict = {}
+        # Materializamos el QS una sola vez
+        ninos = list(qs)
+        nino_ids = [n.pk for n in ninos]
 
-        serializer = NinoListSerializer(qs, many=True, context={'fotos_dict': fotos_dict})
+        # Fotos desde MongoDB con timeout de 2s para no bloquear si está lento
+        from .mongo_client import obtener_fotos_ninos
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
+        fotos_dict = {}
+        try:
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(obtener_fotos_ninos, nino_ids)
+                fotos_dict = fut.result(timeout=2.0)
+        except (FutureTimeout, Exception) as e:
+            logger.warning(f"Fotos de niños no cargadas (MongoDB lento/no disponible): {e}")
+
+        serializer = NinoListSerializer(ninos, many=True, context={'fotos_dict': fotos_dict})
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -223,15 +233,20 @@ class NinosViewSet(viewsets.ViewSet):
                 'motivo_rechazo': padrino.motivo_rechazo or ''
             }, status=status.HTTP_403_FORBIDDEN)
 
-        ninos = Nino.objects.filter(estado_apadrinamiento='Disponible', activo=True)
+        ninos = list(Nino.objects.filter(estado_apadrinamiento='Disponible', activo=True).only(
+            'id', 'nombre_cifrado', 'edad', 'genero', 'estado_apadrinamiento', 'activo'
+        ))
+        nino_ids = [n.pk for n in ninos]
 
         from .mongo_client import obtener_fotos_ninos
-        nino_ids = [n.pk for n in ninos]
+        from concurrent.futures import ThreadPoolExecutor
+        fotos_dict = {}
         try:
-            fotos_dict = obtener_fotos_ninos(nino_ids)
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(obtener_fotos_ninos, nino_ids)
+                fotos_dict = fut.result(timeout=2.0)
         except Exception as e:
-            logger.warning(f"No se pudieron pre-cargar las fotos de niños desde MongoDB: {e}")
-            fotos_dict = {}
+            logger.warning(f"Fotos MongoDB no disponibles: {e}")
 
         serializer = NinoListSerializer(ninos, many=True, context={'fotos_dict': fotos_dict})
         return Response(serializer.data)
@@ -1192,130 +1207,104 @@ class DashboardViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['get'])
     def nosql_stats(self, request):
-        """GET /api/dashboard/nosql-stats/ — agregaciones y métricas de MongoDB (NoSQL)"""
-        from .mongo_client import get_mongo_db
+        """GET /api/dashboard/nosql-stats/ — agregaciones y métricas de MongoDB (NoSQL).
+        Las queries se ejecutan en paralelo y el resultado se cachea 60s."""
+        from .mongo_client import get_mongo_db, _nosql_stats_cache, _nosql_stats_cache_ts, NOSQL_STATS_TTL
+        import api.mongo_client as _mc
+        import time
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # ── Verificar cache en memoria ──────────────────────────────────────
+        now = time.time()
+        if _mc._nosql_stats_cache is not None and (now - _mc._nosql_stats_cache_ts) < NOSQL_STATS_TTL:
+            return Response(_mc._nosql_stats_cache)
+
+        # ── Fallback rápido si MongoDB no responde ──────────────────────────
+        fallback_response = {
+            'documentos_totales': {'evidencias': 0, 'bitacora_eventos': 0, 'cartas': 0, 'ninos_fotos': 0},
+            'eventos_por_tabla':  [{"tabla": "api_nino", "cantidad": 0}, {"tabla": "api_padrino", "cantidad": 0}],
+            'eventos_por_accion': [{"accion": "CREATE", "cantidad": 0}],
+            'evidencias_por_tipo': [{"tipo": "foto", "cantidad": 0}],
+            '_from_fallback': True,
+        }
+
         try:
             db = get_mongo_db()
 
-            # ── Conteo de documentos por colección ──────────────────────────
-            def safe_count(collection_name):
+            # ── Ejecutar todas las queries en paralelo ──────────────────────
+            def count_col(name):
                 try:
-                    return db[collection_name].count_documents({})
-                except Exception as e:
-                    logger.warning(f"No se pudo contar {collection_name}: {e}")
-                    return 0
+                    return (name, db[name].count_documents({}))
+                except Exception:
+                    return (name, 0)
+
+            def agg_eventos_tabla():
+                try:
+                    pipeline = [{"$group": {"_id": "$tabla", "count": {"$sum": 1}}},
+                                {"$sort": {"count": -1}}, {"$limit": 10}]
+                    return [{"tabla": i["_id"] or "General", "cantidad": i["count"]}
+                            for i in db.bitacora_eventos.aggregate(pipeline)]
+                except Exception:
+                    return []
+
+            def agg_eventos_accion():
+                try:
+                    pipeline = [{"$group": {"_id": "$accion", "count": {"$sum": 1}}},
+                                {"$sort": {"count": -1}}, {"$limit": 10}]
+                    return [{"accion": i["_id"] or "UNKNOWN", "cantidad": i["count"]}
+                            for i in db.bitacora_eventos.aggregate(pipeline)]
+                except Exception:
+                    return []
+
+            def agg_evidencias_tipo():
+                try:
+                    pipeline = [{"$group": {"_id": "$tipo", "count": {"$sum": 1}}},
+                                {"$sort": {"count": -1}}]
+                    return [{"tipo": i["_id"] or "otro", "cantidad": i["count"]}
+                            for i in db.evidencias.aggregate(pipeline)]
+                except Exception:
+                    return []
+
+            with ThreadPoolExecutor(max_workers=7) as executor:
+                f_ev   = executor.submit(count_col, 'evidencias')
+                f_bit  = executor.submit(count_col, 'bitacora_eventos')
+                f_car  = executor.submit(count_col, 'cartas')
+                f_fot  = executor.submit(count_col, 'ninos_fotos')
+                f_tab  = executor.submit(agg_eventos_tabla)
+                f_acc  = executor.submit(agg_eventos_accion)
+                f_evi  = executor.submit(agg_evidencias_tipo)
 
             counts = {
-                'evidencias':       safe_count('evidencias'),
-                'bitacora_eventos': safe_count('bitacora_eventos'),
-                'cartas':           safe_count('cartas'),
-                'ninos_fotos':      safe_count('ninos_fotos'),
+                'evidencias':       f_ev.result()[1],
+                'bitacora_eventos': f_bit.result()[1],
+                'cartas':           f_car.result()[1],
+                'ninos_fotos':      f_fot.result()[1],
             }
+            eventos_tabla_res  = f_tab.result() or [{"tabla": "api_nino", "cantidad": 0}]
+            eventos_accion_res = f_acc.result() or [{"accion": "CREATE", "cantidad": 0}]
+            evidencias_tipo_res = f_evi.result()
 
-            # ── Eventos por Tabla ────────────────────────────────────────────
-            try:
-                pipeline_eventos_tabla = [
-                    {"$group": {"_id": "$tabla", "count": {"$sum": 1}}},
-                    {"$sort": {"count": -1}},
-                    {"$limit": 10},
-                ]
-                eventos_tabla = list(db.bitacora_eventos.aggregate(pipeline_eventos_tabla))
-                eventos_tabla_res = [
-                    {"tabla": item["_id"] or "General", "cantidad": item["count"]}
-                    for item in eventos_tabla
-                ]
-            except Exception as e:
-                logger.warning(f"Error en agregación eventos_por_tabla: {e}")
-                eventos_tabla_res = []
-
-            # ── Eventos por Acción ───────────────────────────────────────────
-            try:
-                pipeline_eventos_accion = [
-                    {"$group": {"_id": "$accion", "count": {"$sum": 1}}},
-                    {"$sort": {"count": -1}},
-                    {"$limit": 10},
-                ]
-                eventos_accion = list(db.bitacora_eventos.aggregate(pipeline_eventos_accion))
-                eventos_accion_res = [
-                    {"accion": item["_id"] or "UNKNOWN", "cantidad": item["count"]}
-                    for item in eventos_accion
-                ]
-            except Exception as e:
-                logger.warning(f"Error en agregación eventos_por_accion: {e}")
-                eventos_accion_res = []
-
-            # ── Evidencias por Tipo ──────────────────────────────────────────
-            try:
-                pipeline_evidencias_tipo = [
-                    {"$group": {"_id": "$tipo", "count": {"$sum": 1}}},
-                    {"$sort": {"count": -1}},
-                ]
-                evidencias_tipo = list(db.evidencias.aggregate(pipeline_evidencias_tipo))
-                evidencias_tipo_res = [
-                    {"tipo": (item["_id"] or "otro"), "cantidad": item["count"]}
-                    for item in evidencias_tipo
-                ]
-            except Exception as e:
-                logger.warning(f"Error en agregación evidencias_por_tipo: {e}")
-                evidencias_tipo_res = []
-
-            # ── Fallbacks cuando la BD está vacía o la agregación falló ─────
-
-            # Si hay evidencias pero la agregación devolvió vacío → usar conteo directo
             if not evidencias_tipo_res and counts['evidencias'] > 0:
-                evidencias_tipo_res = [
-                    {"tipo": "foto", "cantidad": counts['evidencias']}
-                ]
+                evidencias_tipo_res = [{"tipo": "foto", "cantidad": counts['evidencias']}]
+            if not evidencias_tipo_res:
+                evidencias_tipo_res = [{"tipo": "foto", "cantidad": 0}]
 
-            if counts['bitacora_eventos'] == 0:
-                eventos_tabla_res = [
-                    {"tabla": "api_nino",           "cantidad": 15},
-                    {"tabla": "api_padrino",         "cantidad": 8},
-                    {"tabla": "api_apadrinamiento",  "cantidad": 10},
-                    {"tabla": "api_entrega",         "cantidad": 5},
-                ]
-                eventos_accion_res = [
-                    {"accion": "CREATE", "cantidad": 20},
-                    {"accion": "UPDATE", "cantidad": 12},
-                    {"accion": "LOGIN",  "cantidad": 6},
-                ]
-
-            if counts['evidencias'] == 0 and not evidencias_tipo_res:
-                evidencias_tipo_res = [
-                    {"tipo": "foto",      "cantidad": 12},
-                    {"tipo": "video",     "cantidad": 3},
-                    {"tipo": "documento", "cantidad": 2},
-                ]
-
-            return Response({
+            result = {
                 'documentos_totales':  counts,
                 'eventos_por_tabla':   eventos_tabla_res,
                 'eventos_por_accion':  eventos_accion_res,
                 'evidencias_por_tipo': evidencias_tipo_res,
-            })
+            }
+
+            # ── Guardar en cache ────────────────────────────────────────────
+            _mc._nosql_stats_cache = result
+            _mc._nosql_stats_cache_ts = time.time()
+
+            return Response(result)
 
         except Exception as e:
             logger.error(f"Error crítico al obtener métricas NoSQL: {e}")
-            # Retornar datos de fallback para no romper el dashboard
-            return Response({
-                'documentos_totales': {
-                    'evidencias': 0, 'bitacora_eventos': 0,
-                    'cartas': 0, 'ninos_fotos': 0,
-                },
-                'eventos_por_tabla':   [
-                    {"tabla": "api_nino", "cantidad": 15},
-                    {"tabla": "api_padrino", "cantidad": 8},
-                ],
-                'eventos_por_accion':  [
-                    {"accion": "CREATE", "cantidad": 20},
-                    {"accion": "UPDATE", "cantidad": 12},
-                ],
-                'evidencias_por_tipo': [
-                    {"tipo": "foto", "cantidad": 12},
-                    {"tipo": "video", "cantidad": 3},
-                ],
-                '_error': str(e),
-            })
+            return Response({**fallback_response, '_error': str(e)})
 
     @action(detail=False, methods=['get'])
     def nosql_contenido(self, request):
