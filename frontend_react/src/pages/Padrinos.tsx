@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Plus, Search, Eye, Pencil, Trash2, ShieldCheck, ShieldAlert,
   CheckCircle2, AlertTriangle, RefreshCw, XCircle, Bot,
@@ -70,25 +70,30 @@ export default function Padrinos() {
     }
   };
 
-  // Filtrado y partición por pestañas
-  const padrinosPorRevisar = padrinos.filter(
-    (p) => !p.puede_apadrinar || p.estado_verificacion === "Pendiente" || p.estado_verificacion === "Requiere_Reintento"
+  // Filtrado y partición por pestañas (memoizado para evitar re-cálculos en cada render)
+  const padrinosPorRevisar = useMemo(() =>
+    padrinos.filter(
+      (p) => !p.puede_apadrinar || p.estado_verificacion === "Pendiente" || p.estado_verificacion === "Requiere_Reintento"
+    ), [padrinos]
   );
 
-  const padrinosDeAlta = padrinos.filter(
-    (p) => p.puede_apadrinar && p.estado_verificacion === "Aprobado"
+  const padrinosDeAlta = useMemo(() =>
+    padrinos.filter(
+      (p) => p.puede_apadrinar && p.estado_verificacion === "Aprobado"
+    ), [padrinos]
   );
 
   const currentList = activeTab === "por_revisar" ? padrinosPorRevisar : padrinosDeAlta;
 
-  const filteredPadrinos = currentList.filter((p) => {
-    const term = searchTerm.toLowerCase();
-    return (
+  const filteredPadrinos = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return currentList;
+    return currentList.filter((p) =>
       p.nombre.toLowerCase().includes(term) ||
       p.email.toLowerCase().includes(term) ||
       p.id_padrino.toLowerCase().includes(term)
     );
-  });
+  }, [currentList, searchTerm]);
 
   // Abrir Modal de Verificación y cargar fotos desde Supabase
   const handleAbrirVerificacion = async (id: string) => {
@@ -176,15 +181,8 @@ export default function Padrinos() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <Breadcrumbs />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
+  // Renderizamos la estructura completa siempre; los skeletons están DENTRO de la tabla
+  // para mostrar el layout inmediatamente sin bloquear el render
 
   return (
     <div className="space-y-6">
@@ -284,7 +282,21 @@ export default function Padrinos() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPadrinos.length === 0 ? (
+                  {loading ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-8" /></TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-36 mb-1" />
+                          <Skeleton className="h-3 w-28" />
+                        </TableCell>
+                        <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-32 rounded-full" /></TableCell>
+                        <TableCell className="text-right pr-6"><Skeleton className="h-8 w-36 ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : filteredPadrinos.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
                         <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-2 opacity-80" />

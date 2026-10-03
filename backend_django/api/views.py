@@ -250,14 +250,29 @@ class PadrinosViewSet(viewsets.ViewSet):
 
     def list(self, request):
         """GET /api/padrinos/ — soporte de filtros por estado_verificacion y puede_apadrinar."""
-        qs = Padrino.objects.filter(activo=True)
+        # Traer solo las columnas necesarias para el listado (evita leer campos grandes)
+        qs = Padrino.objects.filter(activo=True).only(
+            'id', 'nombre_cifrado', 'email', 'fecha_registro',
+            'puede_apadrinar', 'estado_verificacion', 'ia_sospecha', 'motivo_rechazo', 'activo'
+        ).order_by('-fecha_registro')
+
         estado_verif = request.query_params.get('estado_verificacion')
         if estado_verif:
             qs = qs.filter(estado_verificacion=estado_verif)
         puede_ap = request.query_params.get('puede_apadrinar')
         if puede_ap is not None:
             qs = qs.filter(puede_apadrinar=puede_ap.lower() in ['true', '1'])
-        serializer = PadrinoListSerializer(qs, many=True)
+
+        # Descifrado en bulk: un solo loop Python en lugar de N llamadas individuales
+        # Inyectamos el nombre descifrado como atributo temporal en cada objeto
+        padrinos = list(qs)
+        for p in padrinos:
+            try:
+                p._nombre_descifrado = descifrar_campo(p.nombre_cifrado)
+            except Exception:
+                p._nombre_descifrado = '[Sin nombre]'
+
+        serializer = PadrinoListSerializer(padrinos, many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):

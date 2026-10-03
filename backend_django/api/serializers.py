@@ -82,6 +82,11 @@ class PadrinoListSerializer(serializers.ModelSerializer):
         ]
 
     def get_nombre(self, obj):
+        # Primero intentamos el nombre pre-descifrado inyectado desde la view (bulk decrypt)
+        # para evitar llamar descifrar_campo 40 veces individualmente.
+        cached = getattr(obj, '_nombre_descifrado', None)
+        if cached is not None:
+            return cached
         return descifrar_campo(obj.nombre_cifrado)
 
 
