@@ -150,7 +150,7 @@ fun VerificationScreen(
             UploadPhotoCard(
                 title = "Identificación Oficial (INE / IFE)",
                 subtitle = "Fotografía clara por el frente de tu credencial",
-                icon = Icons.Default.AccountBox,
+                icon = Icons.Default.Person,
                 selectedUri = uiState.ineUri,
                 hasExistingPhoto = !padrino?.fotoInePath.isNullOrBlank(),
                 onSelectClick = { ineLauncher.launch("image/*") }
@@ -160,7 +160,7 @@ fun VerificationScreen(
             UploadPhotoCard(
                 title = "Fotografía de Rostro (Selfie)",
                 subtitle = "Rostro descubierto, de frente y con buena iluminación",
-                icon = Icons.Default.Face,
+                icon = Icons.Default.Person,
                 selectedUri = uiState.rostroUri,
                 hasExistingPhoto = !padrino?.fotoRostroPath.isNullOrBlank(),
                 onSelectClick = { rostroLauncher.launch("image/*") }
@@ -212,7 +212,7 @@ fun VerificationScreen(
                     Text("Subiendo y analizando imágenes...")
                 } else {
                     Icon(
-                        imageVector = Icons.Default.Upload,
+                        imageVector = Icons.Default.Send,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
@@ -239,7 +239,7 @@ private fun StatusBanner(
             Tuple5(
                 SuccessGreen.copy(alpha = 0.12f),
                 SuccessGreen,
-                Icons.Default.CheckCircle,
+                Icons.Default.Check,
                 "Identidad Verificada",
                 "¡Felicidades! Tu cuenta está aprobada. Tienes acceso completo para apadrinar niños y realizar entregas."
             )
@@ -248,7 +248,7 @@ private fun StatusBanner(
             Tuple5(
                 WarmYellow.copy(alpha = 0.2f),
                 WarmYellowDark,
-                Icons.Default.HourglassTop,
+                Icons.Default.Info,
                 "En Revisión Administrativa",
                 "Tus fotografías están en proceso de validación. Nuestro equipo revisará la información en breve."
             )
@@ -267,7 +267,7 @@ private fun StatusBanner(
             Tuple5(
                 ErrorRed.copy(alpha = 0.12f),
                 ErrorRed,
-                Icons.Default.Cancel,
+                Icons.Default.Close,
                 "Verificación Denegada",
                 if (!motivo.isNullOrBlank()) "Motivo: \"$motivo\""
                 else "Tu solicitud fue rechazada. Puedes volver a subir una identificación válida para reconsideración."
@@ -277,7 +277,7 @@ private fun StatusBanner(
             Tuple5(
                 OceanBlue.copy(alpha = 0.10f),
                 OceanBlue,
-                Icons.Default.Shield,
+                Icons.Default.Lock,
                 "Pendiente de Envío",
                 "Aún no has enviado tus documentos. Sube tu INE y fotografía para comenzar a apadrinar."
             )
@@ -394,7 +394,7 @@ private fun UploadPhotoCard(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.CheckCircle,
+                            imageVector = Icons.Default.Check,
                             contentDescription = null,
                             tint = SuccessGreen,
                             modifier = Modifier.size(36.dp)
@@ -412,7 +412,7 @@ private fun UploadPhotoCard(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.AddPhotoAlternate,
+                            imageVector = Icons.Default.Add,
                             contentDescription = null,
                             tint = TextSecondary,
                             modifier = Modifier.size(40.dp)
@@ -432,7 +432,7 @@ private fun UploadPhotoCard(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.CameraAlt,
+                    imageVector = Icons.Default.Edit,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )

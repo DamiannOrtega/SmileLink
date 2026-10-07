@@ -4,10 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -111,10 +112,10 @@ fun HomeScreen(
                     ) {
                         Icon(
                             imageVector = when (estadoVerificacion) {
-                                "Pendiente" -> Icons.Default.HourglassTop
+                                "Pendiente" -> Icons.Default.Info
                                 "Requiere_Reintento" -> Icons.Default.Warning
-                                "Rechazado" -> Icons.Default.Cancel
-                                else -> Icons.Default.VerifiedUser
+                                "Rechazado" -> Icons.Default.Close
+                                else -> Icons.Default.Lock
                             },
                             contentDescription = null,
                             tint = when (estadoVerificacion) {

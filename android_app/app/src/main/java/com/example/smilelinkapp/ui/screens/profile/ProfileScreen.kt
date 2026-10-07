@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.smilelinkapp.config.AppConfig
@@ -152,11 +153,11 @@ fun ProfileScreen(
                     ) {
                         Icon(
                             imageVector = when {
-                                puedeApadrinar || estadoVerificacion == "Aprobado" -> Icons.Default.Verified
-                                estadoVerificacion == "Pendiente" -> Icons.Default.HourglassTop
+                                puedeApadrinar || estadoVerificacion == "Aprobado" -> Icons.Default.Check
+                                estadoVerificacion == "Pendiente" -> Icons.Default.Info
                                 estadoVerificacion == "Requiere_Reintento" -> Icons.Default.Warning
-                                estadoVerificacion == "Rechazado" -> Icons.Default.Cancel
-                                else -> Icons.Default.Shield
+                                estadoVerificacion == "Rechazado" -> Icons.Default.Close
+                                else -> Icons.Default.Lock
                             },
                             contentDescription = null,
                             tint = when {
@@ -201,7 +202,7 @@ fun ProfileScreen(
 
             // Menú de Verificación de Identidad
             ProfileMenuItem(
-                icon = Icons.Default.VerifiedUser,
+                icon = Icons.Default.Lock,
                 title = "Verificación de Identidad",
                 subtitle = when {
                     puedeApadrinar || estadoVerificacion == "Aprobado" -> "Aprobado para apadrinar"

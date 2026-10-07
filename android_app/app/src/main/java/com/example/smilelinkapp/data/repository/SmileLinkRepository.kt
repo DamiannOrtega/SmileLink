@@ -5,6 +5,8 @@ import com.example.smilelinkapp.data.api.RetrofitClient
 import com.example.smilelinkapp.data.mock.MockDataProvider
 import com.example.smilelinkapp.data.model.*
 import kotlinx.coroutines.delay
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Repository for managing SmileLink data
@@ -155,19 +157,14 @@ class SmileLinkRepository {
             )
         } else {
             try {
+                val mediaType = "image/*".toMediaTypeOrNull()
                 val inePart = if (ineBytes != null) {
-                    val reqFile = okhttp3.RequestBody.create(
-                        okhttp3.MediaType.parse("image/*"),
-                        ineBytes
-                    )
+                    val reqFile = ineBytes.toRequestBody(mediaType)
                     okhttp3.MultipartBody.Part.createFormData("foto_ine", ineFileName ?: "ine.jpg", reqFile)
                 } else null
 
                 val rostroPart = if (rostroBytes != null) {
-                    val reqFile = okhttp3.RequestBody.create(
-                        okhttp3.MediaType.parse("image/*"),
-                        rostroBytes
-                    )
+                    val reqFile = rostroBytes.toRequestBody(mediaType)
                     okhttp3.MultipartBody.Part.createFormData("foto_rostro", rostroFileName ?: "rostro.jpg", reqFile)
                 } else null
 
