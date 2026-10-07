@@ -74,6 +74,9 @@ fun SmileLinkNavGraph(
             HomeScreen(
                 onChildClick = { childId ->
                     navController.navigate(Screen.ChildDetail.createRoute(childId))
+                },
+                onVerificationClick = {
+                    navController.navigate(Screen.Verification.route)
                 }
             )
         }
@@ -94,6 +97,9 @@ fun SmileLinkNavGraph(
                     navController.navigate(Screen.MyChildren.route) {
                         popUpTo(Screen.Home.route)
                     }
+                },
+                onNavigateToVerification = {
+                    navController.navigate(Screen.Verification.route)
                 }
             )
         }
@@ -119,7 +125,17 @@ fun SmileLinkNavGraph(
                     navController.navigate(Screen.Login.route) {
                         popUpTo(0) { inclusive = true }
                     }
+                },
+                onNavigateToVerification = {
+                    navController.navigate(Screen.Verification.route)
                 }
+            )
+        }
+
+        // Verification
+        composable(Screen.Verification.route) {
+            com.example.smilelinkapp.ui.screens.verification.VerificationScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

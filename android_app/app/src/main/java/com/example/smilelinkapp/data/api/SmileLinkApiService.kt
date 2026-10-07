@@ -35,6 +35,14 @@ interface SmileLinkApiService {
     @PATCH("padrinos/{id}/")
     suspend fun updatePadrino(@Path("id") id: String, @Body padrino: Padrino): Response<Padrino>
     
+    @Multipart
+    @POST("padrinos/{id}/subir-identificacion/")
+    suspend fun subirIdentificacion(
+        @Path("id") id: String,
+        @Part fotoIne: okhttp3.MultipartBody.Part? = null,
+        @Part fotoRostro: okhttp3.MultipartBody.Part? = null
+    ): Response<VerificationUploadResponse>
+    
     // ===== APADRINAMIENTOS (Sponsorships) =====
     @GET("apadrinamientos/")
     suspend fun getApadrinamientos(

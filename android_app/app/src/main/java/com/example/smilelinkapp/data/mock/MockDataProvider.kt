@@ -68,7 +68,9 @@ object MockDataProvider {
             fechaRegistro = "2024-01-10",
             direccion = "Calle Principal 123",
             telefono = "555-0001",
-            historialApadrinamientoIds = listOf("AP001")
+            historialApadrinamientoIds = listOf("AP001"),
+            puedeApadrinar = true,
+            estadoVerificacion = "Aprobado"
         )
     )
     

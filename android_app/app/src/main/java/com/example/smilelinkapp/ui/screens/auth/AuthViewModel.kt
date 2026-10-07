@@ -50,13 +50,19 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 
                 if (response.isSuccessful && response.body() != null) {
                     val authResponse = response.body()!!
-                    sessionManager.saveSession(authResponse.padrino)
+                    sessionManager.saveSession(authResponse.padrino, authResponse.token)
                     _uiState.value = AuthUiState.Success(authResponse.padrino)
                 } else {
-                    val errorMsg = when (response.code()) {
+                    val errBody = try {
+                        val str = response.errorBody()?.string() ?: ""
+                        com.google.gson.JsonParser.parseString(str).asJsonObject.get("error")?.asString
+                    } catch (e: Exception) { null }
+
+                    val errorMsg = errBody ?: when (response.code()) {
                         401 -> "Contraseña incorrecta"
+                        403 -> "Cuenta inactiva"
                         404 -> "Email no registrado"
-                        else -> "Error al iniciar sesión"
+                        else -> "Error al iniciar sesión (${response.code()})"
                     }
                     _uiState.value = AuthUiState.Error(errorMsg)
                 }
@@ -119,12 +125,17 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 
                 if (response.isSuccessful && response.body() != null) {
                     val authResponse = response.body()!!
-                    sessionManager.saveSession(authResponse.padrino)
+                    sessionManager.saveSession(authResponse.padrino, authResponse.token)
                     _uiState.value = AuthUiState.Success(authResponse.padrino)
                 } else {
-                    val errorMsg = when (response.code()) {
-                        400 -> "Este email ya está registrado"
-                        else -> "Error al registrarse"
+                    val errBody = try {
+                        val str = response.errorBody()?.string() ?: ""
+                        com.google.gson.JsonParser.parseString(str).asJsonObject.get("error")?.asString
+                    } catch (e: Exception) { null }
+
+                    val errorMsg = errBody ?: when (response.code()) {
+                        400 -> "Datos inválidos o email ya registrado"
+                        else -> "Error al registrarse (${response.code()})"
                     }
                     _uiState.value = AuthUiState.Error(errorMsg)
                 }

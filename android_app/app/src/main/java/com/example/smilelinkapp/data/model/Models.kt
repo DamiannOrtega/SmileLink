@@ -54,7 +54,7 @@ data class Padrino(
     val passwordHash: String? = null,
     
     @SerializedName("fecha_registro")
-    val fechaRegistro: String,
+    val fechaRegistro: String = "",
     
     @SerializedName("id_google_auth")
     val idGoogleAuth: String? = null,
@@ -66,7 +66,28 @@ data class Padrino(
     val telefono: String? = null,
     
     @SerializedName("historial_apadrinamiento_ids")
-    val historialApadrinamientoIds: List<String>? = emptyList()
+    val historialApadrinamientoIds: List<String>? = emptyList(),
+
+    @SerializedName("puede_apadrinar")
+    val puedeApadrinar: Boolean = false,
+
+    @SerializedName("estado_verificacion")
+    val estadoVerificacion: String = "No Enviado",
+
+    @SerializedName("motivo_rechazo")
+    val motivoRechazo: String? = null,
+
+    @SerializedName("foto_ine_path")
+    val fotoInePath: String? = null,
+
+    @SerializedName("foto_rostro_path")
+    val fotoRostroPath: String? = null,
+
+    @SerializedName("ia_sospecha")
+    val iaSospecha: Boolean = false,
+
+    @SerializedName("fecha_verificacion")
+    val fechaVerificacion: String? = null
 )
 
 /**

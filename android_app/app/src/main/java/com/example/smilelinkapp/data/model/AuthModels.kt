@@ -21,9 +21,24 @@ data class LoginRequest(
 
 data class AuthResponse(
     val message: String,
-    val padrino: Padrino
+    val padrino: Padrino,
+    val token: String? = null
 )
 
 data class ErrorResponse(
-    val error: String
+    val error: String,
+    @SerializedName("puede_apadrinar")
+    val puedeApadrinar: Boolean? = null,
+    @SerializedName("estado_verificacion")
+    val estadoVerificacion: String? = null,
+    @SerializedName("motivo_rechazo")
+    val motivoRechazo: String? = null
+)
+
+data class VerificationUploadResponse(
+    val mensaje: String? = null,
+    @SerializedName("estado_verificacion")
+    val estadoVerificacion: String? = null,
+    @SerializedName("ia_sospecha")
+    val iaSospecha: Boolean? = null
 )

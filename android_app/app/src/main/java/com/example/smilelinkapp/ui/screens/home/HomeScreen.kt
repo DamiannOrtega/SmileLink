@@ -20,8 +20,15 @@ import com.example.smilelinkapp.ui.components.LoadingIndicator
 @Composable
 fun HomeScreen(
     onChildClick: (String) -> Unit,
+    onVerificationClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val sessionManager = remember { com.example.smilelinkapp.data.local.SessionManager(context) }
+    val padrino = sessionManager.getPadrino()
+    val estadoVerificacion = padrino?.estadoVerificacion ?: "No Enviado"
+    val puedeApadrinar = padrino?.puedeApadrinar == true
+
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     var isRefreshing by remember { mutableStateOf(false) }
@@ -71,6 +78,74 @@ fun HomeScreen(
                 singleLine = true,
                 shape = MaterialTheme.shapes.medium
             )
+
+            // Banner de Identidad si no está aprobado
+            if (!puedeApadrinar) {
+                Surface(
+                    onClick = onVerificationClick,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                    color = when (estadoVerificacion) {
+                        "Pendiente" -> com.example.smilelinkapp.ui.theme.WarmYellow.copy(alpha = 0.25f)
+                        "Requiere_Reintento" -> com.example.smilelinkapp.ui.theme.WarningOrange.copy(alpha = 0.2f)
+                        "Rechazado" -> com.example.smilelinkapp.ui.theme.ErrorRed.copy(alpha = 0.15f)
+                        else -> com.example.smilelinkapp.ui.theme.OceanBlue.copy(alpha = 0.12f)
+                    },
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        when (estadoVerificacion) {
+                            "Pendiente" -> com.example.smilelinkapp.ui.theme.WarmYellowDark
+                            "Requiere_Reintento" -> com.example.smilelinkapp.ui.theme.WarningOrange
+                            "Rechazado" -> com.example.smilelinkapp.ui.theme.ErrorRed
+                            else -> com.example.smilelinkapp.ui.theme.OceanBlue
+                        }
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = when (estadoVerificacion) {
+                                "Pendiente" -> Icons.Default.HourglassTop
+                                "Requiere_Reintento" -> Icons.Default.Warning
+                                "Rechazado" -> Icons.Default.Cancel
+                                else -> Icons.Default.VerifiedUser
+                            },
+                            contentDescription = null,
+                            tint = when (estadoVerificacion) {
+                                "Pendiente" -> com.example.smilelinkapp.ui.theme.WarmYellowDark
+                                "Requiere_Reintento" -> com.example.smilelinkapp.ui.theme.WarningOrange
+                                "Rechazado" -> com.example.smilelinkapp.ui.theme.ErrorRed
+                                else -> com.example.smilelinkapp.ui.theme.OceanBlue
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = when (estadoVerificacion) {
+                                    "Pendiente" -> "Documentos en revisión por administración"
+                                    "Requiere_Reintento" -> "Se solicitó reintento de identificación"
+                                    "Rechazado" -> "Verificación de identidad denegada"
+                                    else -> "Verifica tu identidad para poder apadrinar"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                                color = com.example.smilelinkapp.ui.theme.TextPrimary
+                            )
+                            Text(
+                                text = "Toca aquí para revisar tus documentos →",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = com.example.smilelinkapp.ui.theme.TextSecondary
+                            )
+                        }
+                    }
+                }
+            }
 
             // Filters Row
             val genderFilter by viewModel.genderFilter.collectAsState()

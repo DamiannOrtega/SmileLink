@@ -20,6 +20,7 @@ sealed class Screen(val route: String) {
     object MyChildren : Screen("my_children")
     object Map : Screen("map")
     object Profile : Screen("profile")
+    object Verification : Screen("verification")
 }
 
 /**

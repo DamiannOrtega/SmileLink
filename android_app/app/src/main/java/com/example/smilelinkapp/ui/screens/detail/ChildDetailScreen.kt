@@ -30,13 +30,55 @@ fun ChildDetailScreen(
     childId: String,
     onBackClick: () -> Unit,
     onSponsorSuccess: () -> Unit,
+    onNavigateToVerification: () -> Unit = {},
     viewModel: ChildDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val sponsorshipInProgress by viewModel.sponsorshipInProgress.collectAsState()
+    var showVerificationDialog by remember { mutableStateOf(false) }
+    var verificationDialogMessage by remember { mutableStateOf("") }
     
     LaunchedEffect(childId) {
         viewModel.loadChild(childId)
+    }
+
+    if (showVerificationDialog) {
+        AlertDialog(
+            onDismissRequest = { showVerificationDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.VerifiedUser,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(36.dp)
+                )
+            },
+            title = {
+                Text("Verificación de Identidad Requerida")
+            },
+            text = {
+                Text(
+                    text = verificationDialogMessage.ifBlank {
+                        "Para salvaguardar la seguridad de los niños, un administrador debe aprobar tu credencial oficial (INE) y selfie antes de poder apadrinar."
+                    }
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showVerificationDialog = false
+                        onNavigateToVerification()
+                    }
+                ) {
+                    Text("Ir a Verificar Identidad")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showVerificationDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
     
     Scaffold(
@@ -70,7 +112,16 @@ fun ChildDetailScreen(
                 
                 LaunchedEffect(errorMessage) {
                     errorMessage?.let {
-                        android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+                        if (it.contains("identificaci", ignoreCase = true) ||
+                            it.contains("verificar", ignoreCase = true) ||
+                            it.contains("ine", ignoreCase = true) ||
+                            it.contains("403", ignoreCase = true)
+                        ) {
+                            verificationDialogMessage = it
+                            showVerificationDialog = true
+                        } else {
+                            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show()
+                        }
                         errorMessage = null
                     }
                 }

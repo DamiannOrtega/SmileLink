@@ -137,7 +137,56 @@ class SmileLinkRepository {
         }
     }
 
-    
+    suspend fun subirIdentificacion(
+        padrinoId: String,
+        ineBytes: ByteArray? = null,
+        ineFileName: String? = null,
+        rostroBytes: ByteArray? = null,
+        rostroFileName: String? = null
+    ): Result<VerificationUploadResponse> {
+        return if (AppConfig.USE_MOCK) {
+            delay(1000)
+            Result.success(
+                VerificationUploadResponse(
+                    mensaje = "Documentos subidos con éxito (Modo Mock)",
+                    estadoVerificacion = "Pendiente",
+                    iaSospecha = false
+                )
+            )
+        } else {
+            try {
+                val inePart = if (ineBytes != null) {
+                    val reqFile = okhttp3.RequestBody.create(
+                        okhttp3.MediaType.parse("image/*"),
+                        ineBytes
+                    )
+                    okhttp3.MultipartBody.Part.createFormData("foto_ine", ineFileName ?: "ine.jpg", reqFile)
+                } else null
+
+                val rostroPart = if (rostroBytes != null) {
+                    val reqFile = okhttp3.RequestBody.create(
+                        okhttp3.MediaType.parse("image/*"),
+                        rostroBytes
+                    )
+                    okhttp3.MultipartBody.Part.createFormData("foto_rostro", rostroFileName ?: "rostro.jpg", reqFile)
+                } else null
+
+                val response = apiService.subirIdentificacion(padrinoId, inePart, rostroPart)
+                if (response.isSuccessful && response.body() != null) {
+                    Result.success(response.body()!!)
+                } else {
+                    val errBody = try {
+                        val str = response.errorBody()?.string() ?: ""
+                        com.google.gson.JsonParser.parseString(str).asJsonObject.get("error")?.asString
+                    } catch (e: Exception) { null }
+                    Result.failure(Exception(errBody ?: "Error al subir identificación (${response.code()})"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
     // ===== APADRINAMIENTOS (Sponsorships) =====
     
     suspend fun getApadrinamientosForPadrino(padrinoId: String): Result<List<Apadrinamiento>> {
@@ -168,7 +217,11 @@ class SmileLinkRepository {
                 if (response.isSuccessful && response.body() != null) {
                     Result.success(response.body()!!)
                 } else {
-                    Result.failure(Exception("Error: ${response.code()}"))
+                    val errBody = try {
+                        val str = response.errorBody()?.string() ?: ""
+                        com.google.gson.JsonParser.parseString(str).asJsonObject.get("error")?.asString
+                    } catch (e: Exception) { null }
+                    Result.failure(Exception(errBody ?: "Error al crear apadrinamiento (${response.code()})"))
                 }
             } catch (e: Exception) {
                 Result.failure(e)

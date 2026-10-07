@@ -25,20 +25,41 @@ class SessionManager(context: Context) {
         private const val KEY_PADRINO_ID = "padrinoId"
         private const val KEY_EMAIL = "email"
         private const val KEY_NOMBRE = "nombre"
+        private const val KEY_TOKEN = "jwtToken"
     }
     
     /**
      * Save padrino session
      */
-    fun saveSession(padrino: Padrino) {
+    fun saveSession(padrino: Padrino, token: String? = null) {
         prefs.edit().apply {
             putBoolean(KEY_IS_LOGGED_IN, true)
             putString(KEY_PADRINO, gson.toJson(padrino))
             putString(KEY_PADRINO_ID, padrino.idPadrino)
             putString(KEY_EMAIL, padrino.email)
             putString(KEY_NOMBRE, padrino.nombre)
+            if (token != null) {
+                putString(KEY_TOKEN, token)
+            }
             apply()
         }
+    }
+
+    /**
+     * Update existing padrino in session
+     */
+    fun updatePadrino(padrino: Padrino) {
+        prefs.edit().apply {
+            putString(KEY_PADRINO, gson.toJson(padrino))
+            putString(KEY_PADRINO_ID, padrino.idPadrino)
+            putString(KEY_NOMBRE, padrino.nombre)
+            putString(KEY_EMAIL, padrino.email)
+            apply()
+        }
+    }
+
+    fun getToken(): String? {
+        return prefs.getString(KEY_TOKEN, null)
     }
     
     /**
