@@ -162,18 +162,22 @@ def registrar_bitacora(usuario_id, tabla: str, accion: str, detalle: dict = None
         detalle:     Dict con información adicional (opcional)
 
     Returns:
-        str: ObjectId del log insertado
+        str: ObjectId del log insertado, o '' si MongoDB no está disponible.
     """
     from datetime import datetime, timezone
-    db = get_mongo_db()
-    result = db.bitacora_eventos.insert_one({
-        'usuario_id': usuario_id,
-        'tabla':      tabla,
-        'accion':     accion,
-        'detalle':    detalle or {},
-        'timestamp':  datetime.now(timezone.utc),
-    })
-    return str(result.inserted_id)
+    try:
+        db = get_mongo_db()
+        result = db.bitacora_eventos.insert_one({
+            'usuario_id': usuario_id,
+            'tabla':      tabla,
+            'accion':     accion,
+            'detalle':    detalle or {},
+            'timestamp':  datetime.now(timezone.utc),
+        })
+        return str(result.inserted_id)
+    except Exception as e:
+        logger.warning(f"[Bitácora] MongoDB no disponible, acción '{accion}' en '{tabla}' no registrada: {e}")
+        return ''
 
 
 # ──────────────────────────────────────────────────────────────────────────────
