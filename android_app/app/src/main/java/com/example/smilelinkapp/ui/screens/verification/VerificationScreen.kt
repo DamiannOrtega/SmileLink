@@ -105,6 +105,10 @@ fun VerificationScreen(
             val puedeApadrinar = padrino?.puedeApadrinar == true
             val motivo = padrino?.motivoRechazo
 
+            val estaAprobado = puedeApadrinar || estado == "Aprobado"
+            val estaRechazado = estado == "Rechazado"
+            val puedeSubirFotos = !estaAprobado && !estaRechazado
+
             // 1. Tarjeta Principal de Estado de Verificación
             StatusBanner(
                 estado = estado,
@@ -112,8 +116,8 @@ fun VerificationScreen(
                 motivo = motivo
             )
 
-            // 2. Sección informativa si aún no está aprobado
-            if (!puedeApadrinar) {
+            // 2. Sección informativa si aún no está aprobado y no está rechazado
+            if (!estaAprobado && !estaRechazado) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                     shape = RoundedCornerShape(12.dp)
@@ -153,7 +157,13 @@ fun VerificationScreen(
                 icon = Icons.Default.Person,
                 selectedUri = uiState.ineUri,
                 hasExistingPhoto = !padrino?.fotoInePath.isNullOrBlank(),
-                onSelectClick = { ineLauncher.launch("image/*") }
+                enabled = puedeSubirFotos,
+                disabledReason = when {
+                    estaAprobado -> "Identidad Verificada ✔"
+                    estaRechazado -> "Verificación Denegada ✕"
+                    else -> null
+                },
+                onSelectClick = { if (puedeSubirFotos) ineLauncher.launch("image/*") }
             )
 
             // 4. Subida de Foto de Rostro (Selfie)
@@ -163,43 +173,59 @@ fun VerificationScreen(
                 icon = Icons.Default.Person,
                 selectedUri = uiState.rostroUri,
                 hasExistingPhoto = !padrino?.fotoRostroPath.isNullOrBlank(),
-                onSelectClick = { rostroLauncher.launch("image/*") }
+                enabled = puedeSubirFotos,
+                disabledReason = when {
+                    estaAprobado -> "Identidad Verificada ✔"
+                    estaRechazado -> "Verificación Denegada ✕"
+                    else -> null
+                },
+                onSelectClick = { if (puedeSubirFotos) rostroLauncher.launch("image/*") }
             )
 
             // 5. Consejos para que la verificación sea aprobada rápidamente
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-                border = BorderStroke(1.dp, DividerGray),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+            if (!estaAprobado && !estaRechazado) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                    border = BorderStroke(1.dp, DividerGray),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text(
-                        text = "Recomendaciones:",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    TipRow(text = "Asegúrate de que el texto de tu INE sea 100% legible y sin reflejos.")
-                    TipRow(text = "Toma la foto del rostro sin lentes oscuros ni cubrebocas.")
-                    TipRow(text = "Usa fotografías originales de tu cámara (las imágenes editadas con IA son detectadas y marcadas).")
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Recomendaciones:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        TipRow(text = "Asegúrate de que el texto de tu INE sea 100% legible y sin reflejos.")
+                        TipRow(text = "Toma la foto del rostro sin lentes oscuros ni cubrebocas.")
+                        TipRow(text = "Usa fotografías originales de tu cámara (las imágenes editadas con IA son detectadas y marcadas).")
+                    }
                 }
             }
 
             // 6. Botón de Acción para enviar a revisión
-            val canSubmit = uiState.ineUri != null || uiState.rostroUri != null
+            val canSubmit = puedeSubirFotos && (uiState.ineUri != null || uiState.rostroUri != null)
             Button(
-                onClick = { viewModel.uploadDocuments(context) },
+                onClick = { if (puedeSubirFotos) viewModel.uploadDocuments(context) },
                 enabled = canSubmit && !uiState.isUploading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = OceanBlue,
-                    disabledContainerColor = OceanBlue.copy(alpha = 0.4f)
+                    containerColor = when {
+                        estaRechazado -> ErrorRed
+                        estaAprobado -> SuccessGreen
+                        else -> OceanBlue
+                    },
+                    disabledContainerColor = when {
+                        estaRechazado -> ErrorRed.copy(alpha = 0.35f)
+                        estaAprobado -> SuccessGreen.copy(alpha = 0.35f)
+                        else -> OceanBlue.copy(alpha = 0.4f)
+                    }
                 )
             ) {
                 if (uiState.isUploading) {
@@ -212,13 +238,22 @@ fun VerificationScreen(
                     Text("Subiendo y analizando imágenes...")
                 } else {
                     Icon(
-                        imageVector = Icons.Default.Send,
+                        imageVector = when {
+                            estaAprobado -> Icons.Default.Check
+                            estaRechazado -> Icons.Default.Close
+                            else -> Icons.Default.Send
+                        },
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (estado == "Requiere_Reintento" || estado == "Rechazado") "Reenviar Documentos a Revisión" else "Enviar Documentos a Revisión",
+                        text = when {
+                            estaAprobado -> "Identidad Verificada (Aprobado)"
+                            estaRechazado -> "Verificación Rechazada"
+                            estado == "Requiere_Reintento" -> "Reenviar Documentos a Revisión"
+                            else -> "Enviar Documentos a Revisión"
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -269,8 +304,8 @@ private fun StatusBanner(
                 ErrorRed,
                 Icons.Default.Close,
                 "Verificación Denegada",
-                if (!motivo.isNullOrBlank()) "Motivo: \"$motivo\""
-                else "Tu solicitud fue rechazada. Puedes volver a subir una identificación válida para reconsideración."
+                if (!motivo.isNullOrBlank()) "Tu solicitud fue rechazada por la administración. Motivo: \"$motivo\". No es posible subir más fotografías."
+                else "Tu solicitud fue rechazada por la administración. No es posible enviar más fotografías a revisión."
             )
         }
         else -> {
@@ -334,6 +369,8 @@ private fun UploadPhotoCard(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     selectedUri: Uri?,
     hasExistingPhoto: Boolean,
+    enabled: Boolean = true,
+    disabledReason: String? = null,
     onSelectClick: () -> Unit
 ) {
     Card(
@@ -400,7 +437,7 @@ private fun UploadPhotoCard(
                             modifier = Modifier.size(36.dp)
                         )
                         Text(
-                            text = "Fotografía previamente cargada en el servidor",
+                            text = if (!enabled) "Fotografía resguardada en el servidor" else "Fotografía previamente cargada en el servidor",
                             style = MaterialTheme.typography.bodySmall,
                             color = SuccessGreen,
                             fontWeight = FontWeight.Medium
@@ -428,16 +465,25 @@ private fun UploadPhotoCard(
 
             OutlinedButton(
                 onClick = onSelectClick,
+                enabled = enabled,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Edit,
+                    imageVector = if (enabled) Icons.Default.Edit else Icons.Default.Lock,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(if (selectedUri != null) "Cambiar foto seleccionada" else "Seleccionar de la galería")
+                Text(
+                    text = if (!enabled) {
+                        disabledReason ?: "Selección no disponible"
+                    } else if (selectedUri != null) {
+                        "Cambiar foto seleccionada"
+                    } else {
+                        "Seleccionar de la galería"
+                    }
+                )
             }
         }
     }

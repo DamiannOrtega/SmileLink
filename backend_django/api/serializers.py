@@ -44,6 +44,8 @@ class PadrinoSerializer(serializers.ModelSerializer):
     direccion_input = serializers.CharField(write_only=True, required=False, allow_blank=True)
     password        = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
+    foto_rostro_url = serializers.SerializerMethodField()
+
     class Meta:
         model  = Padrino
         fields = [
@@ -54,7 +56,7 @@ class PadrinoSerializer(serializers.ModelSerializer):
             'password',
             'id_google_auth', 'fecha_registro', 'activo',
             'puede_apadrinar', 'estado_verificacion', 'motivo_rechazo',
-            'foto_ine_path', 'foto_rostro_path',
+            'foto_ine_path', 'foto_rostro_path', 'foto_rostro_url',
             'ia_sospecha', 'ia_reporte', 'fecha_verificacion',
             'created_at', 'updated_at',
         ]
@@ -68,6 +70,12 @@ class PadrinoSerializer(serializers.ModelSerializer):
 
     def get_direccion(self, obj):
         return descifrar_campo(obj.direccion_cifrada)
+
+    def get_foto_rostro_url(self, obj):
+        if obj.foto_rostro_path:
+            from .supabase_client import generar_url_firmada
+            return generar_url_firmada(obj.foto_rostro_path, expires_in=3600)
+        return ""
 
 
 class PadrinoListSerializer(serializers.ModelSerializer):

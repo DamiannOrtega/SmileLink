@@ -437,6 +437,18 @@ class PadrinosViewSet(viewsets.ViewSet):
         except Padrino.DoesNotExist:
             return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
 
+        if padrino.estado_verificacion == 'Rechazado':
+            return Response(
+                {'error': 'Tu solicitud de verificación fue rechazada de forma definitiva. No es posible subir nuevas fotografías.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if padrino.puede_apadrinar or padrino.estado_verificacion == 'Aprobado':
+            return Response(
+                {'error': 'Tu identidad ya fue aprobada y puedes apadrinar. No es necesario subir más fotografías.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         from utils.image_analysis import analizar_imagen_ia
         from .supabase_client import subir_archivo_identificacion, guardar_fragmento_padrino
 

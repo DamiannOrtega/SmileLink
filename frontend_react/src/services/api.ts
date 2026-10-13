@@ -27,6 +27,7 @@ export interface Padrino {
   motivo_rechazo?: string;
   foto_ine_path?: string;
   foto_rostro_path?: string;
+  foto_rostro_url?: string;
   ia_sospecha?: boolean;
   ia_reporte?: any;
   fecha_verificacion?: string;
@@ -501,6 +502,7 @@ const normPadrino = (p: any): Padrino => ({
   motivo_rechazo: p.motivo_rechazo || '',
   foto_ine_path: p.foto_ine_path || '',
   foto_rostro_path: p.foto_rostro_path || '',
+  foto_rostro_url: p.foto_rostro_url || '',
   ia_sospecha: Boolean(p.ia_sospecha),
   ia_reporte: p.ia_reporte || {},
   fecha_verificacion: p.fecha_verificacion || undefined,

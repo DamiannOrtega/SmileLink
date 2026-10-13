@@ -40,11 +40,16 @@ export default function PadrinoDetalle() {
 
     try {
       setLoading(true);
-      const [padrinoData, apadrinamientosData, ninosData] = await Promise.all([
+      const [padrinoData, apadrinamientosData, ninosData, verifData] = await Promise.all([
         PadrinosService.getById(id),
         ApadrinamientosService.getByPadrino(id),
-        NinosService.getAll()
+        NinosService.getAll(),
+        PadrinosService.getVerificacion(id).catch(() => null)
       ]);
+
+      if (verifData?.foto_rostro_url) {
+        padrinoData.foto_rostro_url = verifData.foto_rostro_url;
+      }
 
       setPadrino(padrinoData);
       setApadrinamientos(apadrinamientosData);
@@ -119,8 +124,16 @@ export default function PadrinoDetalle() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="aspect-square relative overflow-hidden rounded-lg bg-muted flex items-center justify-center mb-4">
-              <User className="h-20 w-20 text-muted-foreground" />
+            <div className="aspect-square relative overflow-hidden rounded-xl bg-muted flex items-center justify-center mb-4 border border-border/50 shadow-sm">
+              {padrino.foto_rostro_url ? (
+                <img
+                  src={padrino.foto_rostro_url}
+                  alt={padrino.nombre}
+                  className="w-full h-full object-cover rounded-xl"
+                />
+              ) : (
+                <User className="h-20 w-20 text-muted-foreground/50" />
+              )}
             </div>
             <div className="space-y-3">
               <div>
