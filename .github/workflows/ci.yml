@@ -43,7 +43,15 @@ jobs:
         env:
           USE_SQLITE: "True"
         run: |
-          python manage.py test api --verbosity=2
+          python manage.py test api.tests --verbosity=2
+
+      # PASO 4: Ejecución de pruebas de integración
+      - name: 4. Ejecutar pruebas de integración (Django REST Framework)
+        working-directory: backend_django
+        env:
+          USE_SQLITE: "True"
+        run: |
+          python manage.py test api.test_integration --verbosity=2
 
   # =========================================================================
   # JOB 2: FRONTEND (React / Node.js)
@@ -74,3 +82,9 @@ jobs:
         working-directory: frontend_react
         run: |
           npm run test:unit
+
+      # PASO 4: Ejecución de pruebas de integración
+      - name: 4. Ejecutar pruebas de integración (Node.js)
+        working-directory: frontend_react
+        run: |
+          npm run test:integration
