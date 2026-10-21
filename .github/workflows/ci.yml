@@ -8,18 +8,55 @@ on:
 
 jobs:
   # =========================================================================
-  # PASO 1: Descarga de código fuente (Checkout)
+  # JOB 1: BACKEND (Django / Python)
   # =========================================================================
   backend:
     name: Backend CI (Django)
     runs-on: ubuntu-latest
     steps:
+      # PASO 1: Descarga de código fuente
       - name: 1. Descarga de código fuente del repositorio
         uses: actions/checkout@v4
 
+      # PASO 2: Configuración del entorno y dependencias
+      - name: 2a. Configurar entorno Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'backend_django/requirements.txt'
+
+      - name: 2b. Instalar librerías del sistema (MySQL client)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y default-libmysqlclient-dev pkg-config build-essential
+
+      - name: 2c. Instalar dependencias de Python
+        working-directory: backend_django
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+  # =========================================================================
+  # JOB 2: FRONTEND (React / Node.js)
+  # =========================================================================
   frontend:
     name: Frontend CI (React)
     runs-on: ubuntu-latest
     steps:
+      # PASO 1: Descarga de código fuente
       - name: 1. Descarga de código fuente del repositorio
         uses: actions/checkout@v4
+
+      # PASO 2: Configuración del entorno y dependencias
+      - name: 2a. Configurar entorno Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend_react/package-lock.json'
+
+      - name: 2b. Instalar dependencias de Node (npm ci)
+        working-directory: frontend_react
+        run: |
+          npm ci
