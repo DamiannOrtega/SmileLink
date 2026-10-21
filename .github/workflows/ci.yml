@@ -1,0 +1,25 @@
+name: CI/CD Pipeline - SmileLink
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  # =========================================================================
+  # PASO 1: Descarga de código fuente (Checkout)
+  # =========================================================================
+  backend:
+    name: Backend CI (Django)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Descarga de código fuente del repositorio
+        uses: actions/checkout@v4
+
+  frontend:
+    name: Frontend CI (React)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. Descarga de código fuente del repositorio
+        uses: actions/checkout@v4
