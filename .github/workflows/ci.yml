@@ -37,6 +37,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # PASO 3: Ejecución de pruebas unitarias
+      - name: 3. Ejecutar pruebas unitarias (Django)
+        working-directory: backend_django
+        env:
+          USE_SQLITE: "True"
+        run: |
+          python manage.py test api --verbosity=2
+
   # =========================================================================
   # JOB 2: FRONTEND (React / Node.js)
   # =========================================================================
@@ -60,3 +68,9 @@ jobs:
         working-directory: frontend_react
         run: |
           npm ci
+
+      # PASO 3: Ejecución de pruebas unitarias
+      - name: 3. Ejecutar pruebas unitarias (Node.js)
+        working-directory: frontend_react
+        run: |
+          npm run test:unit
