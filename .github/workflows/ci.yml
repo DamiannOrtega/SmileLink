@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ "**" ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   # =========================================================================
   # JOB 1: BACKEND (Django / Python)
@@ -81,6 +85,26 @@ jobs:
           # Escanea vulnerabilidades como inyección SQL, hardcoded secrets o criptografía débil
           bandit -r . -x ./venv,./api/migrations -ll -ii || true
 
+      # PASO 7: Compilación y Empaquetado del Proyecto (Docker y GitHub Packages)
+      - name: 7a. Compilación de estáticos (Django collectstatic)
+        working-directory: backend_django
+        env:
+          USE_SQLITE: "True"
+        run: |
+          python manage.py collectstatic --noinput
+
+      - name: 7b. Empaquetado en imagen Docker (Backend)
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/${REPO_LOWER}/backend:latest ./backend_django
+
+      - name: 7c. Publicar contenedor en GitHub Packages (GHCR)
+        if: github.event_name == 'push'
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push ghcr.io/${REPO_LOWER}/backend:latest || true
+
   # =========================================================================
   # JOB 2: FRONTEND (React / Node.js)
   # =========================================================================
@@ -129,3 +153,28 @@ jobs:
         run: |
           # Escanea vulnerabilidades conocidas en paquetes npm contra GitHub Advisory Database
           npm audit --audit-level=critical || true
+
+      # PASO 7: Compilación y Empaquetado del Proyecto (Build, Docker y GitHub Packages)
+      - name: 7a. Compilación del proyecto (Vite build)
+        working-directory: frontend_react
+        run: |
+          npm run build
+
+      - name: 7b. Publicar artefacto de compilación descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-production-dist
+          path: frontend_react/dist/
+          retention-days: 7
+
+      - name: 7c. Empaquetado en imagen Docker (Frontend)
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          docker build -t ghcr.io/${REPO_LOWER}/frontend:latest ./frontend_react
+
+      - name: 7d. Publicar contenedor en GitHub Packages (GHCR)
+        if: github.event_name == 'push'
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push ghcr.io/${REPO_LOWER}/frontend:latest || true
