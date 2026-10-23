@@ -449,7 +449,6 @@ class PadrinosViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        from utils.image_analysis import analizar_imagen_ia
         from .supabase_client import subir_archivo_identificacion, guardar_fragmento_padrino
 
         foto_ine = request.FILES.get('foto_ine')
@@ -461,46 +460,26 @@ class PadrinosViewSet(viewsets.ViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        reporte_ia = padrino.ia_reporte or {}
-        ia_detectada = False
-
-        # 1. Procesar y analizar Foto INE
+        # 1. Procesar Foto INE
         if foto_ine:
             ine_bytes = foto_ine.read()
-            analisis_ine = analizar_imagen_ia(ine_bytes, foto_ine.name)
-            reporte_ia['ine'] = analisis_ine
-            if analisis_ine['es_sospechosa_ia']:
-                ia_detectada = True
-
             ine_path = f"padrinos/{padrino.pk}/ine_{int(datetime.now().timestamp())}.jpg"
             subido = subir_archivo_identificacion(
                 ine_path, ine_bytes, content_type=foto_ine.content_type or 'image/jpeg'
             )
-            if subido:
-                padrino.foto_ine_path = ine_path
-            else:
-                # Almacenar referencia interna
-                padrino.foto_ine_path = ine_path
+            padrino.foto_ine_path = ine_path
 
-        # 2. Procesar y analizar Foto Rostro
+        # 2. Procesar Foto Rostro
         if foto_rostro:
             rostro_bytes = foto_rostro.read()
-            analisis_rostro = analizar_imagen_ia(rostro_bytes, foto_rostro.name)
-            reporte_ia['rostro'] = analisis_rostro
-            if analisis_rostro['es_sospechosa_ia']:
-                ia_detectada = True
-
             rostro_path = f"padrinos/{padrino.pk}/rostro_{int(datetime.now().timestamp())}.jpg"
             subido = subir_archivo_identificacion(
                 rostro_path, rostro_bytes, content_type=foto_rostro.content_type or 'image/jpeg'
             )
-            if subido:
-                padrino.foto_rostro_path = rostro_path
-            else:
-                padrino.foto_rostro_path = rostro_path
+            padrino.foto_rostro_path = rostro_path
 
-        padrino.ia_sospecha = ia_detectada
-        padrino.ia_reporte = reporte_ia
+        padrino.ia_sospecha = False
+        padrino.ia_reporte = {}
         padrino.estado_verificacion = 'Pendiente'
         padrino.motivo_rechazo = ''  # Limpiar motivo de rechazo previo al reintentar
         padrino.save()
@@ -512,15 +491,14 @@ class PadrinosViewSet(viewsets.ViewSet):
                 direccion_cifrada_str=padrino.direccion_cifrada.decode('latin1', errors='ignore') if padrino.direccion_cifrada else '',
                 foto_ine_path=padrino.foto_ine_path,
                 foto_rostro_path=padrino.foto_rostro_path,
-                ia_sospecha=padrino.ia_sospecha,
-                ia_reporte=padrino.ia_reporte
+                ia_sospecha=False,
+                ia_reporte={}
             )
         except Exception as e:
             logger.warning(f"Error sincronizando fragmento en Supabase: {e}")
 
         # Notificar en bitácora
         registrar_bitacora(padrino.pk, 'api_padrino', 'UPLOAD_VERIFICATION_PHOTOS', {
-            'ia_sospecha': ia_detectada,
             'ine_subida': bool(foto_ine),
             'rostro_subido': bool(foto_rostro)
         })
@@ -528,8 +506,8 @@ class PadrinosViewSet(viewsets.ViewSet):
         return Response({
             'mensaje': 'Fotografías subidas correctamente y puestas en revisión por el administrador.',
             'estado_verificacion': padrino.estado_verificacion,
-            'ia_sospecha': padrino.ia_sospecha,
-            'ia_reporte': padrino.ia_reporte,
+            'ia_sospecha': False,
+            'ia_reporte': {},
         }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'], url_path='verificacion')

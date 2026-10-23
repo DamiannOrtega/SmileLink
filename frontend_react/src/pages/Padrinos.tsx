@@ -277,7 +277,6 @@ export default function Padrinos() {
                     <TableHead className="font-semibold">Padrino / Donante</TableHead>
                     <TableHead className="font-semibold">Fecha Registro</TableHead>
                     <TableHead className="font-semibold">Estado Verificación</TableHead>
-                    <TableHead className="font-semibold">Análisis Forense IA</TableHead>
                     <TableHead className="text-right font-semibold pr-6">Acción Requerida</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -292,13 +291,12 @@ export default function Padrinos() {
                         </TableCell>
                         <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-32 rounded-full" /></TableCell>
                         <TableCell className="text-right pr-6"><Skeleton className="h-8 w-36 ml-auto" /></TableCell>
                       </TableRow>
                     ))
                   ) : filteredPadrinos.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={5} className="text-center py-12 text-muted-foreground">
                         <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-2 opacity-80" />
                         No hay identificaciones pendientes por revisar. ¡Todo al día!
                       </TableCell>
@@ -330,17 +328,6 @@ export default function Padrinos() {
                           {padrino.estado_verificacion === "Rechazado" && (
                             <Badge variant="destructive" className="bg-red-500/15 text-red-500 border-red-500/30 gap-1">
                               <XCircle className="h-3 w-3" /> Rechazado
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {padrino.ia_sospecha ? (
-                            <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/40 gap-1.5 animate-pulse">
-                              <Bot className="h-3.5 w-3.5" /> Posible IA Detectada
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 gap-1">
-                              <CheckCircle2 className="h-3 w-3" /> Metadatos Normales
                             </Badge>
                           )}
                         </TableCell>
@@ -499,34 +486,6 @@ export default function Padrinos() {
                   )}
                 </div>
               </div>
-
-              {/* SECCIÓN FORENSE / ALERTA DE INTELIGENCIA ARTIFICIAL */}
-              {verifData.ia_sospecha ? (
-                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 space-y-2">
-                  <div className="flex items-center gap-2 font-semibold text-red-400">
-                    <Bot className="h-5 w-5 text-red-500 animate-bounce" />
-                    <span>⚠️ ALERTA DE SEGURIDAD: FOTOGRAFÍA GENERADA CON INTELIGENCIA ARTIFICIAL</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground text-red-300">
-                    El analizador de metadatos forenses ha detectado firmas, chunks de prompts o ausencia total de cámara física en las imágenes proporcionadas.
-                  </p>
-                  {verifData.ia_reporte && verifData.ia_reporte.motivos && (
-                    <ul className="text-xs list-disc list-inside space-y-1 bg-red-950/30 p-2.5 rounded border border-red-500/20 font-mono">
-                      {verifData.ia_reporte.motivos.map((m: string, idx: number) => (
-                        <li key={idx}>{m}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-3">
-                  <Camera className="h-5 w-5 text-emerald-500 shrink-0" />
-                  <div className="text-xs">
-                    <span className="font-semibold block text-emerald-300">Metadatos de Cámara Física Consistentes</span>
-                    No se detectaron firmas de generadores generativos de IA en los archivos.
-                  </div>
-                </div>
-              )}
 
               {/* FOTOGRAFÍAS: CREDENCIAL INE Y ROSTRO */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

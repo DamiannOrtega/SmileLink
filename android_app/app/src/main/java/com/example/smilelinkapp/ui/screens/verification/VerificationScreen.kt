@@ -201,7 +201,7 @@ fun VerificationScreen(
                         )
                         TipRow(text = "Asegúrate de que el texto de tu INE sea 100% legible y sin reflejos.")
                         TipRow(text = "Toma la foto del rostro sin lentes oscuros ni cubrebocas.")
-                        TipRow(text = "Usa fotografías originales de tu cámara (las imágenes editadas con IA son detectadas y marcadas).")
+                        TipRow(text = "Usa fotografías nítidas, bien iluminadas y centradas.")
                     }
                 }
             }
