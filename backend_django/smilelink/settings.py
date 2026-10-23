@@ -5,6 +5,7 @@ MySQL Primario (10.66.207.165) + MongoDB (10.66.207.161) + Fernet encryption
 
 from pathlib import Path
 import os
+import sys
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -83,20 +84,28 @@ WSGI_APPLICATION = 'smilelink.wsgi.application'
 # Réplica en 10.66.207.161 (read-only, no se conecta aquí directamente)
 # ==============================================================================
 
-DATABASES = {
-    'default': {
-        'ENGINE':   'django.db.backends.mysql',
-        'NAME':     os.getenv('MYSQL_DB',       'smilelink'),
-        'USER':     os.getenv('MYSQL_USER',     'smilelink_user'),
-        'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
-        'HOST':     os.getenv('MYSQL_HOST',     '10.66.207.165'),
-        'PORT':     os.getenv('MYSQL_PORT',     '3306'),
-        'OPTIONS': {
-            'charset':  'utf8mb4',
-            'sql_mode': 'STRICT_TRANS_TABLES',
-        },
+if 'test' in sys.argv or os.getenv('USE_SQLITE', 'False').lower() in ('true', '1'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE':   'django.db.backends.mysql',
+            'NAME':     os.getenv('MYSQL_DB',       'smilelink'),
+            'USER':     os.getenv('MYSQL_USER',     'smilelink_user'),
+            'PASSWORD': os.getenv('MYSQL_PASSWORD', ''),
+            'HOST':     os.getenv('MYSQL_HOST',     '10.66.207.165'),
+            'PORT':     os.getenv('MYSQL_PORT',     '3306'),
+            'OPTIONS': {
+                'charset':  'utf8mb4',
+                'sql_mode': 'STRICT_TRANS_TABLES',
+            },
+        }
+    }
 
 
 # ==============================================================================
@@ -116,7 +125,7 @@ MONGODB_PASS = os.getenv('MONGODB_PASS', '')
 # Generar con: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 # ==============================================================================
 
-FERNET_KEY = os.getenv('FERNET_KEY', '').strip()
+FERNET_KEY = os.getenv('FERNET_KEY', 'viZoS_2vBWVIq3aDWWmcCObghw5jugGiIr4hqfv6rRk=').strip()
 if FERNET_KEY.startswith('FERNET_KEY='):
     FERNET_KEY = FERNET_KEY.split('=', 1)[1].strip()
 
