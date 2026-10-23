@@ -63,6 +63,24 @@ jobs:
           # Análisis de calidad de código y complejidad ciclomática
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
 
+      # PASO 6: Análisis de Vulnerabilidades (Seguridad)
+      - name: 6a. Instalar herramientas de escaneo de vulnerabilidades
+        working-directory: backend_django
+        run: |
+          python -m pip install pip-audit bandit
+
+      - name: 6b. Análisis de vulnerabilidades en dependencias (pip-audit)
+        working-directory: backend_django
+        run: |
+          # Escanea requirements.txt contra la base de datos de vulnerabilidades PyPA/OSV
+          pip-audit -r requirements.txt --desc || true
+
+      - name: 6c. Análisis de vulnerabilidades en código fuente (Bandit SAST)
+        working-directory: backend_django
+        run: |
+          # Escanea vulnerabilidades como inyección SQL, hardcoded secrets o criptografía débil
+          bandit -r . -x ./venv,./api/migrations -ll -ii || true
+
   # =========================================================================
   # JOB 2: FRONTEND (React / Node.js)
   # =========================================================================
@@ -104,3 +122,10 @@ jobs:
         working-directory: frontend_react
         run: |
           npm run lint
+
+      # PASO 6: Análisis de Vulnerabilidades (Seguridad)
+      - name: 6. Análisis de vulnerabilidades en dependencias (npm audit)
+        working-directory: frontend_react
+        run: |
+          # Escanea vulnerabilidades conocidas en paquetes npm contra GitHub Advisory Database
+          npm audit --audit-level=critical || true
