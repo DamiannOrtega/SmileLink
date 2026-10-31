@@ -490,9 +490,7 @@ class PadrinosViewSet(viewsets.ViewSet):
                 id_padrino=padrino.pk,
                 direccion_cifrada_str=padrino.direccion_cifrada.decode('latin1', errors='ignore') if padrino.direccion_cifrada else '',
                 foto_ine_path=padrino.foto_ine_path,
-                foto_rostro_path=padrino.foto_rostro_path,
-                ia_sospecha=False,
-                ia_reporte={}
+                foto_rostro_path=padrino.foto_rostro_path
             )
         except Exception as e:
             logger.warning(f"Error sincronizando fragmento en Supabase: {e}")

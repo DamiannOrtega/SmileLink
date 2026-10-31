@@ -273,9 +273,7 @@ class Command(BaseCommand):
                     id_padrino=padrino.pk,
                     direccion_cifrada_str=direccion_cifrada_bytes.decode('latin1', errors='ignore'),
                     foto_ine_path=padrino.foto_ine_path,
-                    foto_rostro_path=padrino.foto_rostro_path,
-                    ia_sospecha=ia_sospecha,
-                    ia_reporte=ia_rep
+                    foto_rostro_path=padrino.foto_rostro_path
                 )
             except Exception:
                 pass

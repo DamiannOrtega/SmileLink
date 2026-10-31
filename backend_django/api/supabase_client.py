@@ -118,9 +118,7 @@ def guardar_fragmento_padrino(
     id_padrino: int,
     direccion_cifrada_str: str,
     foto_ine_path: str = "",
-    foto_rostro_path: str = "",
-    ia_sospecha: bool = False,
-    ia_reporte: dict = None
+    foto_rostro_path: str = ""
 ) -> bool:
     """
     Guarda o actualiza el fragmento vertical sensible del padrino en Supabase PostgREST
@@ -145,8 +143,6 @@ def guardar_fragmento_padrino(
         "direccion_cifrada": direccion_cifrada_str or "",
         "foto_ine_path": foto_ine_path or "",
         "foto_rostro_path": foto_rostro_path or "",
-        "ia_sospecha": bool(ia_sospecha),
-        "ia_reporte": ia_reporte or {},
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 

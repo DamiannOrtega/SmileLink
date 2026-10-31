@@ -194,7 +194,7 @@ export default function Padrinos() {
           <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             Gestión de Padrinos
             <Badge variant="outline" className="text-sm font-normal py-1 px-3 border-primary/30 bg-primary/5">
-              Fragmentación Vertical & Verificación IA
+              Fragmentación Vertical & Verificación de Identidad
             </Badge>
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -441,7 +441,7 @@ export default function Padrinos() {
         </TabsContent>
       </Tabs>
 
-      {/* MODAL DE REVISIÓN DE IDENTIDAD (INE + ROSTRO + ANÁLISIS IA) */}
+      {/* MODAL DE REVISIÓN DE IDENTIDAD (INE + ROSTRO) */}
       <Dialog open={verifModalOpen} onOpenChange={setVerifModalOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -450,7 +450,7 @@ export default function Padrinos() {
               Expediente de Verificación de Identidad
             </DialogTitle>
             <DialogDescription>
-              Inspecciona las fotos cargadas de forma privada en Supabase y el reporte forense de IA antes de autorizar al usuario.
+              Inspecciona las fotos cargadas de forma privada en Supabase antes de autorizar al usuario.
             </DialogDescription>
           </DialogHeader>
 
