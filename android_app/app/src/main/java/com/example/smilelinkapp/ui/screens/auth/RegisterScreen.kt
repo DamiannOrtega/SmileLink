@@ -1,6 +1,7 @@
 package com.example.smilelinkapp.ui.screens.auth
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -46,6 +47,7 @@ fun RegisterScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Crear Cuenta") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateToLogin) {

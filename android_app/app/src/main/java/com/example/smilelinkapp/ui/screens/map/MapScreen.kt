@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -13,6 +14,9 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +39,7 @@ fun MapScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { 
                     Text(
                         "Puntos de Entrega",
@@ -109,9 +114,9 @@ private fun MapContent(
             <div id="map"></div>
             <script>
                 var map = L.map('map', { zoomControl: true }).setView([21.8853, -102.2916], 12);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 20,
-                    attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19,
+                    attribution: '&copy; Esri &mdash; Street Map'
                 }).addTo(map);
                 
                 function addMarker(lat, lng, title) {
@@ -241,6 +246,7 @@ private fun DeliveryPointBottomSheet(
     point: PuntoEntrega,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface
@@ -287,7 +293,23 @@ private fun DeliveryPointBottomSheet(
             
             // Action button
             Button(
-                onClick = { /* TODO: Open in Google Maps */ },
+                onClick = {
+                    val label = Uri.encode(point.nombrePunto)
+                    val gmmIntentUri = Uri.parse("geo:${point.latitud},${point.longitud}?q=${point.latitud},${point.longitud}($label)")
+                    val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+                        setPackage("com.google.android.apps.maps")
+                    }
+                    try {
+                        context.startActivity(mapIntent)
+                    } catch (e: Exception) {
+                        // Fallback a navegador o app compatible
+                        val browserIntent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://www.google.com/maps/search/?api=1" + "&query=${point.latitud},${point.longitud}")
+                        )
+                        context.startActivity(browserIntent)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(

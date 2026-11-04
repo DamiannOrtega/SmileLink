@@ -2,6 +2,7 @@ package com.example.smilelinkapp.ui.screens.detail
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -85,6 +86,7 @@ fun ChildDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 title = { Text("Perfil del Niño") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
