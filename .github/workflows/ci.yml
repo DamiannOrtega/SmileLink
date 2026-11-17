@@ -1,6 +1,7 @@
 name: CI/CD Pipeline - SmileLink
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "**" ]
   pull_request:
@@ -39,8 +40,8 @@ jobs:
         working-directory: backend_django
         run: |
           python -m pip install --upgrade pip
-          pip install flake8
-          pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+          python -m pip install -r requirements.txt
 
       # PASO 3: Ejecución de pruebas unitarias
       - name: 3. Ejecutar pruebas unitarias (Django)
@@ -63,9 +64,10 @@ jobs:
         working-directory: backend_django
         run: |
           # Detiene la pipeline si hay errores de sintaxis Python o nombres no definidos
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv
-          # Análisis de calidad de código y complejidad ciclomática
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
+          python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv
+          # Análisis de calidad de código y complejidad ciclomática.
+          # Los hallazgos deben corregirse; no se convierten en éxitos.
+          python -m flake8 . --count --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
 
       # PASO 6: Análisis de Vulnerabilidades (Seguridad)
       - name: 6a. Instalar herramientas de escaneo de vulnerabilidades
@@ -77,13 +79,13 @@ jobs:
         working-directory: backend_django
         run: |
           # Escanea requirements.txt contra la base de datos de vulnerabilidades PyPA/OSV
-          pip-audit -r requirements.txt --desc || true
+          python -m pip_audit -r requirements.txt --desc
 
       - name: 6c. Análisis de vulnerabilidades en código fuente (Bandit SAST)
         working-directory: backend_django
         run: |
           # Escanea vulnerabilidades como inyección SQL, hardcoded secrets o criptografía débil
-          bandit -r . -x ./venv,./api/migrations -ll -ii || true
+          python -m bandit -r . -x ./venv,./api/migrations -ll -ii
 
       # PASO 7: Compilación y Empaquetado del Proyecto (Docker y GitHub Packages)
       - name: 7a. Compilación de estáticos (Django collectstatic)
@@ -103,7 +105,7 @@ jobs:
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker push ghcr.io/${REPO_LOWER}/backend:latest || true
+          docker push ghcr.io/${REPO_LOWER}/backend:latest
 
   # =========================================================================
   # JOB 2: FRONTEND (React / Node.js)
@@ -152,7 +154,7 @@ jobs:
         working-directory: frontend_react
         run: |
           # Escanea vulnerabilidades conocidas en paquetes npm contra GitHub Advisory Database
-          npm audit --audit-level=critical || true
+          npm audit --audit-level=critical
 
       # PASO 7: Compilación y Empaquetado del Proyecto (Build, Docker y GitHub Packages)
       - name: 7a. Compilación del proyecto (Vite build)
@@ -177,4 +179,4 @@ jobs:
         run: |
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          docker push ghcr.io/${REPO_LOWER}/frontend:latest || true
+          docker push ghcr.io/${REPO_LOWER}/frontend:latest
