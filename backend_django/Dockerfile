@@ -25,7 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . .
 
 # Recopilar archivos estáticos para producción
-RUN USE_SQLITE=True python manage.py collectstatic --noinput || true
+RUN USE_SQLITE=True python manage.py collectstatic --noinput
 
 # Puerto expuesto
 EXPOSE 8000
