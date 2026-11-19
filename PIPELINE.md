@@ -211,7 +211,7 @@ inválida o nombres no definidos.
 El análisis adicional de Flake8 revisa:
 
 ```bash
-flake8 . --count --exit-zero \
+flake8 . --count \
   --max-complexity=10 \
   --max-line-length=127 \
   --statistics \
@@ -219,8 +219,7 @@ flake8 . --count --exit-zero \
 ```
 
 Ayuda a encontrar funciones demasiado complejas y líneas demasiado largas.
-Como usa `--exit-zero`, reporta problemas, pero actualmente no bloquea la
-ejecución.
+Sus errores deben corregirse y bloquean la ejecucion.
 
 En el frontend, ESLint realiza una función equivalente:
 
@@ -238,8 +237,7 @@ npm audit --audit-level=critical
 ```
 
 Busca versiones con vulnerabilidades publicadas en bases de datos conocidas.
-Actualmente estos dos comandos llevan `|| true` dentro del workflow, por lo
-que muestran hallazgos pero no detienen el pipeline automáticamente.
+Los hallazgos devuelven un error y detienen el pipeline hasta que se corrijan las dependencias.
 
 ### 5.8 Vulnerabilidades potenciales en el código Python
 
@@ -250,8 +248,8 @@ bandit -r . -x ./venv,./api/migrations -ll -ii
 ```
 
 Puede señalar posibles secretos escritos en el código, uso inseguro de
-funciones, problemas de inyección o criptografía débil. También usa `|| true`
-en el workflow y por eso funciona actualmente como reporte no bloqueante.
+funciones, problemas de inyección o criptografía débil. También usa ``
+y bloquea el pipeline hasta que se corrija.
 
 ### 5.9 Compilación del frontend
 
@@ -306,7 +304,7 @@ docker push ghcr.io/${REPO_LOWER}/frontend:latest
 ```
 
 Esto comprueba el paso de entrega de imágenes al registro de GitHub. La
-publicación tiene `|| true`, así que un error al subir la imagen puede no
+publicación tiene ``, así que un error al subir la imagen puede no
 marcar el job como fallido.
 
 ## 6. ¿Cómo se revisan los conflictos?
@@ -344,9 +342,8 @@ dos ramas tienen conflictos de merge.
 
 Además, que el pipeline esté verde no garantiza por sí solo que:
 
-- Los hallazgos de seguridad sean cero, porque las auditorías usan `|| true`.
-- La imagen Docker se haya publicado, porque el `docker push` también usa
-  `|| true`.
+- Los hallazgos de seguridad deben quedar dentro de los umbrales configurados.
+- La imagen Docker debe publicarse correctamente en eventos push.
 - El código cumpla requisitos funcionales que no tengan pruebas automatizadas.
 - El cambio sea correcto desde el punto de vista de negocio.
 
@@ -573,7 +570,7 @@ Set-Location .\backend_django
 $env:USE_SQLITE = "True"
 python manage.py test api.tests api.test_integration --verbosity=2
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv
-flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
+flake8 . --count --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
 pip-audit -r requirements.txt --desc
 bandit -r . -x .\venv,.\api\migrations -ll -ii
 python manage.py collectstatic --noinput
@@ -777,7 +774,7 @@ Si encuentra estos errores, el pipeline falla.
 Después se ejecuta un análisis más amplio:
 
 ```bash
-flake8 . --count --exit-zero \
+flake8 . --count \
   --max-complexity=10 \
   --max-line-length=127 \
   --statistics \
@@ -785,7 +782,7 @@ flake8 . --count --exit-zero \
 ```
 
 Este segundo análisis revisa complejidad ciclomática y longitud de líneas,
-pero utiliza `--exit-zero`. Por ello muestra los resultados sin bloquear el
+y sus errores bloquean el
 pipeline.
 
 ### 4.8 Auditoría de seguridad
@@ -799,20 +796,19 @@ python -m pip install pip-audit bandit
 #### pip-audit
 
 ```bash
-pip-audit -r requirements.txt --desc || true
+pip-audit -r requirements.txt --desc
 ```
 
 Busca versiones vulnerables de las dependencias de Python usando bases de
 datos públicas de vulnerabilidades.
 
-El `|| true` hace que el comando termine con resultado exitoso aunque encuentre
-vulnerabilidades. Por tanto, actualmente el resultado sirve como reporte,
-pero no bloquea la ejecución del pipeline.
+Si encuentra vulnerabilidades, termina con error y bloquea la ejecucion hasta
+que se actualicen las dependencias.
 
 #### Bandit
 
 ```bash
-bandit -r . -x ./venv,./api/migrations -ll -ii || true
+bandit -r . -x ./venv,./api/migrations -ll -ii
 ```
 
 Bandit realiza análisis estático de seguridad sobre el código Python. Busca
@@ -823,9 +819,7 @@ patrones potencialmente peligrosos, por ejemplo:
 - Posibles problemas de inyección.
 - Criptografía o configuraciones débiles.
 
-Se excluyen `venv` y las migraciones. Las opciones `-ll` y `-ii` limitan el
-reporte a problemas de severidad y confianza altas. Debido a `|| true`,
-actualmente Bandit tampoco bloquea el pipeline.
+Sus hallazgos bloquean el pipeline hasta que se corrija el codigo.
 
 ### 4.9 Recopilar archivos estáticos
 
@@ -860,7 +854,7 @@ recopila estáticos y arranca Django con Gunicorn.
 ```bash
 echo "${{ secrets.GITHUB_TOKEN }}" |
   docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-docker push ghcr.io/${REPO_LOWER}/backend:latest || true
+docker push ghcr.io/${REPO_LOWER}/backend:latest
 ```
 
 Este paso solo se ejecuta en eventos `push`:
@@ -873,7 +867,7 @@ En un Pull Request se construye la imagen, pero no se publica. El token
 automático de GitHub permite autenticarse en GHCR sin escribir credenciales
 personales en el repositorio.
 
-El `|| true` también evita que un error del `docker push` marque el job como
+El `` también evita que un error del `docker push` marque el job como
 fallido. La imagen puede quedar sin actualizar si ocurre un error de
 publicación, por lo que este comportamiento debe tenerse presente.
 
@@ -943,13 +937,13 @@ errores comunes de JavaScript/TypeScript y reglas configuradas para React.
 ### 5.6 Auditoría de npm
 
 ```bash
-npm audit --audit-level=critical || true
+npm audit --audit-level=critical
 ```
 
 Busca vulnerabilidades conocidas en los paquetes npm instalados. Solo reporta
 vulnerabilidades críticas o superiores según el nivel indicado.
 
-El `|| true` significa que un hallazgo no bloquea el pipeline actualmente.
+Un hallazgo critico devuelve un error y bloquea el pipeline hasta que se actualicen las dependencias.
 
 ### 5.7 Compilar con Vite
 
@@ -997,7 +991,7 @@ realiza dos etapas:
 En eventos `push`, se autentica en GHCR y publica:
 
 ```bash
-docker push ghcr.io/${REPO_LOWER}/frontend:latest || true
+docker push ghcr.io/${REPO_LOWER}/frontend:latest
 ```
 
 En Pull Requests la imagen solo se construye y no se publica.
@@ -1013,13 +1007,13 @@ código distinto de cero. En este pipeline:
 | Pruebas Django | Sí |
 | Pruebas Node | Sí |
 | Flake8 de errores graves | Sí |
-| Segundo Flake8 de calidad | No |
-| `pip-audit` | No, usa `|| true` |
-| Bandit | No, usa `|| true` |
-| `npm audit` | No, usa `|| true` |
+| Segundo Flake8 de calidad | Si |
+| `pip-audit` | Si |
+| Bandit | Si |
+| `npm audit` | Si |
 | `collectstatic` | Sí |
 | Build Docker | Sí |
-| Publicación GHCR | No, usa `|| true` |
+| Publicación GHCR | No, usa `` |
 
 Esta diferencia es importante: que el workflow aparezca como exitoso no
 garantiza que las auditorías de seguridad estén libres de vulnerabilidades ni
@@ -1046,7 +1040,7 @@ python manage.py test api.tests --verbosity=2
 python manage.py test api.test_integration --verbosity=2
 
 flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv
-flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
+flake8 . --count --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
 
 pip-audit -r requirements.txt --desc
 bandit -r . -x .\venv,.\api\migrations -ll -ii
@@ -1352,7 +1346,7 @@ El pipeline funciona como una puerta automática de calidad para SmileLink:
 - Frontend: Node 20, React, pruebas, ESLint, auditoría npm, Vite y Docker.
 - Entrega: artefacto `dist` del frontend y publicaciones opcionales en GHCR.
 - Seguridad: `pip-audit`, Bandit y `npm audit` están configurados, aunque sus
-  resultados no bloquean actualmente por el uso de `|| true`.
+los hallazgos bloquean el pipeline hasta que se corrijan.
 - Android: todavía no está incluido en el workflow.
 
 Para cambiar el comportamiento del pipeline se debe editar
