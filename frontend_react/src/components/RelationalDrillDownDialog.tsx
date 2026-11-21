@@ -242,7 +242,7 @@ export function RelationalDrillDownDialog({
               <div>
                 <p className="font-semibold">{String(n.nombre ?? "")}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {n.edad} años · {String(n.genero ?? "")}
+                  {String(n.edad ?? "")} años · {String(n.genero ?? "")}
                 </p>
               </div>
               <div className="flex items-center gap-2">
