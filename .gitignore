@@ -92,3 +92,7 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# Cobertura de pruebas
+.coverage
+coverage/

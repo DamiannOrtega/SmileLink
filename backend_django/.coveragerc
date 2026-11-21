@@ -1,0 +1,15 @@
+[run]
+source = .
+omit =
+    venv/*
+    staticfiles/*
+    */migrations/*
+    manage.py
+    */tests.py
+    */test_*.py
+    api/management/*
+
+[report]
+# Piso minimo actual; subirlo conforme se agreguen pruebas.
+fail_under = 30
+show_missing = False
