@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, ChevronDown, LogOut, Activity } from "lucide-react";
+import { ChevronDown, LogOut, Activity } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -68,13 +68,6 @@ export function TopBar() {
             className="text-muted-foreground hover:text-primary transition-colors"
           >
             <Activity className="h-5 w-5" />
-          </Button>
-
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-semibold text-destructive-foreground">
-              3
-            </span>
           </Button>
 
           <DropdownMenu>

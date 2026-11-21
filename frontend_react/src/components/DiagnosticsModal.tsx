@@ -97,7 +97,7 @@ export function DiagnosticsModal({ open, onOpenChange }: DiagnosticsModalProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-bold">
             <Activity className="h-5 w-5 text-primary animate-pulse" />
@@ -108,7 +108,7 @@ export function DiagnosticsModal({ open, onOpenChange }: DiagnosticsModalProps) 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 flex-1 min-h-0 overflow-y-auto pr-1">
           {/* 1. MySQL Relational Check */}
           <div className="flex flex-col p-3 rounded-lg border border-border bg-card space-y-2">
             <div className="flex items-center justify-between">
