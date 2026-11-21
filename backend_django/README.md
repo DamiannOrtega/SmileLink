@@ -141,6 +141,95 @@ python manage.py shell
 >>> storage.save('ninos', 'N001', {'nombre': 'Test', 'edad': 8})
 ```
 
+## 🔄 Pipeline CI/CD
+
+El pipeline de GitHub Actions ejecuta las pruebas, el linting, las auditorías de
+seguridad y la compilación del backend y frontend. Los errores no se ignoran ni
+se convierten en resultados exitosos: si una comprobación falla, el job se
+detiene y muestra en los logs qué debe corregirse.
+
+Para corregir un fallo localmente antes de subir cambios:
+
+```bash
+# Backend
+python -m pip install -r requirements-dev.txt
+python manage.py test api.tests api.test_integration --verbosity=2
+python -m flake8 . --count --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
+python -m pip_audit -r requirements.txt --desc
+python -m bandit -r . -x ./venv,./api/migrations -ll -ii
+
+# Frontend
+cd ../frontend_react
+npm ci
+npm run test:unit
+npm run test:integration
+npm run lint
+npm audit --audit-level=critical
+npm run build
+```
+
+Correcciones automáticas seguras:
+
+```powershell
+# Frontend: corrige reglas que ESLint puede resolver sin cambiar la lógica
+cd ..\frontend_react
+npm run lint:fix
+
+# Backend: corrige formato Python; después revisa el diff
+cd ..\backend_django
+python -m autopep8 --in-place --recursive api authentication storage smilelink utils
+```
+
+Estas herramientas no resuelven automáticamente errores de lógica,
+vulnerabilidades, pruebas fallidas ni funciones demasiado complejas. Esos
+problemas se muestran en los logs y deben corregirse manualmente. Para
+dependencias npm, `npm audit fix` puede actualizar versiones compatibles, pero
+se debe revisar el diff y repetir las pruebas; evita `npm audit fix --force`
+sin revisar cambios mayores.
+
+La corrección debe hacerse en el código o en los archivos de dependencias y
+subirse mediante un commit; el runner no oculta ni guarda cambios temporales.
+
+### Probar el flujo completo
+
+1. Guarda los cambios y ejecuta localmente las comprobaciones anteriores.
+2. Si todo termina con código `0`, crea un commit y súbelo:
+
+   ```powershell
+   git add .
+   git commit -m "Validar pipeline"
+   git push origin TU-RAMA
+   ```
+
+3. En GitHub abre **Actions**, selecciona **CI/CD Pipeline - SmileLink** y
+   revisa los jobs `Backend CI (Django)` y `Frontend CI (React)`.
+4. También puedes ejecutarlo sin hacer un commit desde **Run workflow**, porque
+   el workflow admite `workflow_dispatch`.
+
+El pipeline avanza en orden: instalación, pruebas, linting, auditorías,
+compilación, Docker y publicación. Si un comando devuelve un código distinto de
+`0`, el paso aparece en rojo y los logs muestran el archivo, la línea y el
+comando que deben corregirse. Después de corregirlo localmente, sube otro commit
+para que GitHub vuelva a ejecutar todo el flujo.
+
+El pipeline no modifica automáticamente el código del repositorio. ESLint puede
+proponer correcciones locales con `npm run lint -- --fix`, pero las pruebas,
+Flake8, Bandit, `pip-audit`, `npm audit`, Docker y los errores de lógica deben
+analizarse y corregirse explícitamente; ocultarlos haría que el pipeline fuera
+falsamente exitoso.
+
+Resultado de la última prueba local:
+
+- Frontend: pruebas, lint y build correctos; el lint reportó warnings, no errores.
+- Backend: 12 pruebas correctas.
+- Backend Flake8: encontró errores de formato/calidad y detuvo el flujo. Cada
+  línea aparece en los logs con archivo, número y regla; hay que corregirla y
+  volver a ejecutar `python -m flake8`.
+- `npm audit --audit-level=critical`: no encontró vulnerabilidades críticas,
+  aunque sí reportó vulnerabilidades de severidad menor. Para corregirlas de
+  forma controlada se puede ejecutar `npm audit fix`, revisar el diff y repetir
+  las pruebas. No se debe usar `--force` sin revisar posibles cambios mayores.
+
 ## 📝 Notas
 
 - Por defecto usa almacenamiento local (`./local_data`)
