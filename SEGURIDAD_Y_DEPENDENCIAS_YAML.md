@@ -1,4 +1,4 @@
-# Dependencias y seguridad del YAML
+# Dependencias y seguridad del YAML para estudiar
 
 Archivo revisado: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
