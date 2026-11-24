@@ -91,6 +91,15 @@ if 'test' in sys.argv or os.getenv('USE_SQLITE', 'False').lower() in ('true', '1
             'NAME': ':memory:',
         }
     }
+elif os.getenv('USE_SQLITE_LOCAL', 'False').lower() in ('true', '1'):
+    # Modo local para probar en tu máquina sin MySQL: guarda todo en db_local.sqlite3.
+    # Uso: $env:USE_SQLITE_LOCAL="True"; python manage.py migrate; python manage.py crear_usuarios_demo
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db_local.sqlite3',
+        }
+    }
 else:
     DATABASES = {
         'default': {
@@ -194,8 +203,13 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser',   # Para subida de archivos/evidencias
         'rest_framework.parsers.FormParser',
     ],
+    # Cada petición debe traer "Authorization: Bearer <token>" (ver api/authentication.py).
+    # Solo login/registro/diagnóstico están abiertos (marcados con AllowAny en su vista).
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.JWTAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',      # Cambiar en producción
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
@@ -246,7 +260,8 @@ CORS_ALLOW_HEADERS = [
 
 JWT_SECRET_KEY      = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
 JWT_ALGORITHM       = os.getenv('JWT_ALGORITHM', 'HS256')
-JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '24'))
+# 8 horas = una jornada de trabajo. Al vencer, el usuario vuelve a iniciar sesión.
+JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '8'))
 
 
 # ==============================================================================

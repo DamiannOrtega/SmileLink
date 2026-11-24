@@ -8,6 +8,8 @@
  * IMPORTANTE: Los nombres de campos respetan estrictamente data_models.md
  */
 
+import { getToken, cerrarSesionPorExpiracion } from "@/lib/auth";
+
 // ============================================================================
 // INTERFACES TYPESCRIPT (Basadas en data_models.md)
 // ============================================================================
@@ -413,14 +415,24 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit, timeoutMs = 
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    // JWT: cada petición lleva el token del administrador para que el backend
+    // sepa quién es. Sin él, el backend responde 401.
+    const token = getToken();
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },
       signal: controller.signal,
-      ...options,
     });
+
+    // 401 = token ausente, inválido o vencido → volver a iniciar sesión.
+    if (response.status === 401) {
+      cerrarSesionPorExpiracion();
+      throw new Error("Tu sesión expiró. Inicia sesión de nuevo.");
+    }
 
     if (!response.ok) {
       let message = `HTTP Error ${response.status}: ${response.statusText}`;

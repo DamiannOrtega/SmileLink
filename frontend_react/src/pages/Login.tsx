@@ -10,7 +10,11 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() =>
+    new URLSearchParams(window.location.search).has("expirada")
+      ? "Tu sesión expiró. Inicia sesión de nuevo."
+      : ""
+  );
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

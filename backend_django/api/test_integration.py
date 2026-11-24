@@ -98,6 +98,15 @@ class TestPuntosEntregaIntegration(APITestCase):
 
     def test_creacion_y_listado_punto_entrega(self):
         """Prueba integración: POST crea punto -> GET lista punto con status 200."""
+        # El CRUD de puntos es del panel web: requiere token de administrador.
+        from django.contrib.auth.hashers import make_password
+        from api.authentication import generar_jwt_admin
+        from api.models import Administrador
+        admin = Administrador.objects.create(
+            nombre='Admin Pruebas', email='admin.puntos@smilelink.org', rol='Administrador',
+            password_hash=make_password('ClaveAdmin2026!'),
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {generar_jwt_admin(admin)}')
         payload = {
             'nombre_punto': 'Punto DIF Central Aguascalientes',
             'direccion_fisica': 'Av. Convención 101, Col. Del Carmen',

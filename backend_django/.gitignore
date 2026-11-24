@@ -48,3 +48,6 @@ Thumbs.db
 # Storage
 local_data/
 *.enc
+
+# Base local de pruebas (USE_SQLITE_LOCAL)
+db_local.sqlite3

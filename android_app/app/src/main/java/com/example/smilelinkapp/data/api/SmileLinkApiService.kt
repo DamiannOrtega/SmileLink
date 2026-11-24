@@ -106,6 +106,7 @@ interface SmileLinkApiService {
     @POST("auth/logout/")
     suspend fun logout(): Response<Map<String, String>>
     
+    // El backend identifica al padrino por el token JWT (AuthInterceptor), no por un id en la URL.
     @GET("auth/me/")
-    suspend fun getCurrentUser(@Query("padrino_id") padrinoId: String): Response<Padrino>
+    suspend fun getCurrentUser(): Response<Padrino>
 }

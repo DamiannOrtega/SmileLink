@@ -5,19 +5,19 @@ Registro, login y sesión de padrinos.
 - Datos personales: cifrado Fernet
 - JWT para sesiones
 """
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from django.contrib.auth.hashers import make_password, check_password
 from django.conf import settings
-import jwt
 import re
 import logging
-from datetime import datetime, timedelta, timezone
 
 from api.models import Padrino, Administrador
 from utils.encryption import cifrar_campo, descifrar_campo
 from api.mongo_client import registrar_bitacora
+from api.authentication import generar_jwt_padrino as generar_jwt, generar_jwt_admin
 
 logger = logging.getLogger(__name__)
 
@@ -26,30 +26,6 @@ def validate_email(email: str) -> bool:
     """Valida formato de email."""
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
-
-
-def generar_jwt(padrino: Padrino) -> str:
-    """Genera un token JWT para el padrino."""
-    payload = {
-        'padrino_id': padrino.pk,
-        'email':      padrino.email,
-        'exp':        datetime.now(timezone.utc) + timedelta(hours=settings.JWT_EXPIRATION_HOURS),
-        'iat':        datetime.now(timezone.utc),
-    }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-
-
-def generar_jwt_admin(admin: Administrador) -> str:
-    """Genera un token JWT para el Administrador."""
-    payload = {
-        'admin_id': admin.pk,
-        'email':    admin.email,
-        'rol':      admin.rol,
-        'nombre':   admin.nombre,
-        'exp':      datetime.now(timezone.utc) + timedelta(hours=settings.JWT_EXPIRATION_HOURS),
-        'iat':      datetime.now(timezone.utc),
-    }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
 def _padrino_to_dict(padrino: Padrino) -> dict:
@@ -77,6 +53,8 @@ def _padrino_to_dict(padrino: Padrino) -> dict:
 # ──────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
+@authentication_classes([])  # no leer tokens viejos aquí
+@permission_classes([AllowAny])
 def register(request):
     """
     POST /api/auth/register/
@@ -155,6 +133,8 @@ def register(request):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
+@authentication_classes([])  # no leer tokens viejos aquí
+@permission_classes([AllowAny])
 def login(request):
     """
     POST /api/auth/login/
@@ -206,36 +186,23 @@ def login(request):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_current_user(request):
     """
     GET /api/auth/me/
-    Header: Authorization: Bearer <jwt_token>
-    O query param: ?padrino_id=<id>
+    Header obligatorio: Authorization: Bearer <jwt_token>
+    Devuelve los datos de quien es dueño del token (padrino o administrador).
     """
-    # Intentar desde token JWT
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-            padrino_id = payload.get('padrino_id')
-            padrino = Padrino.objects.get(pk=padrino_id)
-            return Response(_padrino_to_dict(padrino))
-        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
-            return Response({'error': 'Token inválido o expirado'}, status=status.HTTP_401_UNAUTHORIZED)
-        except Padrino.DoesNotExist:
-            return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-
-    # Fallback: por query param (compatibilidad con versión anterior)
-    padrino_id = request.query_params.get('padrino_id')
-    if padrino_id:
-        try:
-            padrino = Padrino.objects.get(pk=padrino_id)
-            return Response(_padrino_to_dict(padrino))
-        except Padrino.DoesNotExist:
-            return Response({'error': 'Padrino no encontrado'}, status=status.HTTP_404_NOT_FOUND)
-
-    return Response({'error': 'Autenticación requerida'}, status=status.HTTP_401_UNAUTHORIZED)
+    usuario = request.user
+    if usuario.es_padrino:
+        return Response(_padrino_to_dict(usuario.padrino))
+    admin = usuario.admin
+    return Response({
+        'id':     admin.pk,
+        'nombre': admin.nombre,
+        'email':  admin.email,
+        'rol':    admin.rol,
+    })
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -243,6 +210,8 @@ def get_current_user(request):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
+@authentication_classes([])  # no leer tokens viejos aquí
+@permission_classes([AllowAny])
 def logout(request):
     """POST /api/auth/logout/ — el cliente descarta el token JWT."""
     return Response({'message': 'Sesión cerrada exitosamente'}, status=status.HTTP_200_OK)
@@ -253,6 +222,8 @@ def logout(request):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
+@authentication_classes([])  # no leer tokens viejos aquí
+@permission_classes([AllowAny])
 def google_login(request):
     """
     POST /api/auth/google/
@@ -315,6 +286,8 @@ def google_login(request):
 # ──────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
+@authentication_classes([])  # no leer tokens viejos aquí
+@permission_classes([AllowAny])
 def admin_login(request):
     """
     POST /api/auth/admin-login/
@@ -346,11 +319,7 @@ def admin_login(request):
             status=status.HTTP_403_FORBIDDEN
         )
 
-    print(f"[DEBUG LOGIN] Email recibido: {repr(email)}")
-    print(f"[DEBUG LOGIN] Password recibido: {repr(password)}")
-    print(f"[DEBUG LOGIN] Hash en BD: {repr(admin.password_hash)[:30]}")
     es_valida = check_password(password, admin.password_hash)
-    print(f"[DEBUG LOGIN] ¿Es valida?: {es_valida}")
 
     # Verificar contraseña con Django check_password (soporta PBKDF2)
     if not es_valida:

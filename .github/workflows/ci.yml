@@ -74,7 +74,7 @@ jobs:
         env:
           USE_SQLITE: "True"
         run: |
-          coverage run --append manage.py test api.test_integration api.test_views --verbosity=2
+          coverage run --append manage.py test api.test_integration api.test_views api.test_jwt --verbosity=2
 
       - name: 4b. Verificar cobertura mínima de pruebas
         working-directory: backend_django

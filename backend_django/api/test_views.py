@@ -8,23 +8,26 @@ Cubre:
 
 MongoDB y la bitácora se simulan: estas pruebas no necesitan servicios externos.
 """
-import jwt
-from django.conf import settings
 from django.contrib.auth.hashers import make_password
 from rest_framework import status
 from rest_framework.test import APITestCase
 from unittest.mock import patch
 
+from api.authentication import generar_jwt_admin, generar_jwt_padrino
 from api.models import Administrador, Nino, Padrino
 from utils.encryption import cifrar_campo, descifrar_campo
 
 
 def _token_padrino(padrino):
-    return jwt.encode(
-        {'padrino_id': padrino.pk},
-        settings.JWT_SECRET_KEY,
-        algorithm=settings.JWT_ALGORITHM,
+    return generar_jwt_padrino(padrino)
+
+
+def _token_admin():
+    admin = Administrador.objects.create(
+        nombre='Admin Pruebas', email='admin.pruebas@smilelink.org', rol='Administrador',
+        password_hash=make_password('ClaveAdmin2026!'),
     )
+    return generar_jwt_admin(admin)
 
 
 def _crear_padrino(email, **extra):
@@ -103,6 +106,7 @@ class TestAccesoNinosPorVerificacion(APITestCase):
         self.assertEqual([n['nombre'] for n in res.data], ['Pepito'])
 
     def test_detalle_inexistente_devuelve_404(self, _bit, _fotos):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {_token_admin()}')
         res = self.client.get('/api/ninos/99999/')
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -120,6 +124,10 @@ class TestCicloDeVidaNino(APITestCase):
         'descripcion': 'Le gusta cantar',
         'necesidades': ['mochila'],
     }
+
+    def setUp(self):
+        # Estas acciones son del panel web: requieren token de administrador.
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {_token_admin()}')
 
     def test_crear_cifra_el_nombre_en_la_base_de_datos(self, _bit, _fotos, _guardar):
         res = self.client.post('/api/ninos/', self.payload, format='json')

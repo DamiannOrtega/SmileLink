@@ -3,9 +3,7 @@ SmileLink API — Views
 ViewSets completos usando ORM Django (MySQL) + MongoDB para datos semiestructurados.
 Todos los campos sensibles se cifran/descifran con Fernet antes de persistir.
 """
-import jwt
 from datetime import datetime, timezone
-from django.conf import settings
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -20,21 +18,21 @@ from .models import (
 
 
 def _get_authenticated_padrino(request):
-    """Extrae el objeto Padrino si la petición proviene de un padrino autenticado."""
-    auth_header = request.headers.get('Authorization', '')
-    if auth_header.startswith('Bearer '):
-        token = auth_header.split(' ')[1]
-        try:
-            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-            padrino_id = payload.get('padrino_id')
-            if padrino_id:
-                return Padrino.objects.filter(pk=padrino_id).first()
-        except Exception:
-            pass
-    padrino_id = request.query_params.get('padrino_id')
-    if padrino_id:
-        return Padrino.objects.filter(pk=padrino_id).first()
+    """
+    Devuelve el Padrino dueño del token JWT, o None si quien llama es un administrador.
+    La identidad sale SOLO del token (ya no se acepta ?padrino_id= en la URL).
+    """
+    usuario = request.user
+    if getattr(usuario, 'es_padrino', False):
+        return usuario.padrino
     return None
+
+
+def _sin_permiso():
+    return Response({'error': 'No tienes permiso para ver o modificar este recurso.'},
+                    status=status.HTTP_403_FORBIDDEN)
+
+
 from .serializers import (
     AdministradorSerializer,
     PadrinoSerializer, PadrinoListSerializer,
@@ -45,6 +43,7 @@ from .serializers import (
 )
 from utils.encryption import cifrar_campo, descifrar_campo
 from utils.avatars import generar_url_avatar
+from .authentication import PermisosPorRolMixin
 from .mongo_client import (
     guardar_evidencia, obtener_evidencias,
     registrar_bitacora, guardar_carta, registrar_notificacion,
@@ -59,7 +58,7 @@ logger = logging.getLogger(__name__)
 # NIÑOS
 # ──────────────────────────────────────────────────────────────────────────────
 
-class NinosViewSet(viewsets.ViewSet):
+class NinosViewSet(PermisosPorRolMixin, viewsets.ViewSet):
     """
     ViewSet para Niños.
     GET    /api/ninos/           → lista (con filtros opcionales por estado)
@@ -69,7 +68,10 @@ class NinosViewSet(viewsets.ViewSet):
     PATCH  /api/ninos/{id}/      → actualizar parcialmente
     DELETE /api/ninos/{id}/      → soft-delete (activo=False)
     GET    /api/ninos/disponibles/ → niños con estado=Disponible
+
+    Padrinos (app): solo lectura. Administradores: todo.
     """
+    acciones_padrino = ('list', 'retrieve', 'disponibles')
 
     def list(self, request):
         """GET /api/ninos/ — lista todos los niños activos."""
@@ -256,12 +258,20 @@ class NinosViewSet(viewsets.ViewSet):
 # PADRINOS
 # ──────────────────────────────────────────────────────────────────────────────
 
-class PadrinosViewSet(viewsets.ViewSet):
+class PadrinosViewSet(PermisosPorRolMixin, viewsets.ViewSet):
     """
     ViewSet para Padrinos.
     Nombre, teléfono y dirección se cifran con Fernet.
     La contraseña se hashea con Django PBKDF2.
+
+    Un padrino solo puede ver/editar SU perfil y subir SU identificación.
     """
+    acciones_padrino = ('retrieve', 'partial_update', 'subir_identificacion')
+
+    @staticmethod
+    def _es_otro_padrino(request, pk):
+        propio = _get_authenticated_padrino(request)
+        return propio is not None and str(propio.pk) != str(pk)
 
     def list(self, request):
         """GET /api/padrinos/ — soporte de filtros por estado_verificacion y puede_apadrinar."""
@@ -292,6 +302,8 @@ class PadrinosViewSet(viewsets.ViewSet):
 
     def retrieve(self, request, pk=None):
         """GET /api/padrinos/{id}/"""
+        if self._es_otro_padrino(request, pk):
+            return _sin_permiso()
         try:
             padrino = Padrino.objects.get(pk=pk)
         except Padrino.DoesNotExist:
@@ -375,6 +387,8 @@ class PadrinosViewSet(viewsets.ViewSet):
 
     def partial_update(self, request, pk=None):
         """PATCH /api/padrinos/{id}/"""
+        if self._es_otro_padrino(request, pk):
+            return _sin_permiso()
         try:
             padrino = Padrino.objects.get(pk=pk)
         except Padrino.DoesNotExist:
@@ -395,7 +409,7 @@ class PadrinosViewSet(viewsets.ViewSet):
                 )
             except Exception:
                 pass
-        if 'activo' in data:
+        if 'activo' in data and request.user.es_admin:  # un padrino no puede (des)activarse
             padrino.activo = data['activo']
 
         padrino.save()
@@ -432,6 +446,8 @@ class PadrinosViewSet(viewsets.ViewSet):
           - foto_rostro: Archivo de fotografía del rostro / selfie.
         Analiza metadatos con IA detector, sube a Supabase y pone estado en 'Pendiente'.
         """
+        if self._es_otro_padrino(request, pk):
+            return _sin_permiso()
         try:
             padrino = Padrino.objects.get(pk=pk)
         except Padrino.DoesNotExist:
@@ -614,8 +630,9 @@ class PadrinosViewSet(viewsets.ViewSet):
 # APADRINAMIENTOS
 # ──────────────────────────────────────────────────────────────────────────────
 
-class ApadrinamientosViewSet(viewsets.ViewSet):
-    """ViewSet para Apadrinamientos."""
+class ApadrinamientosViewSet(PermisosPorRolMixin, viewsets.ViewSet):
+    """ViewSet para Apadrinamientos. Un padrino solo ve y crea los suyos."""
+    acciones_padrino = ('list', 'retrieve', 'create')
 
     def list(self, request):
         """GET /api/apadrinamientos/"""
@@ -623,7 +640,8 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
         estado = request.query_params.get('estado')
         if estado:
             qs = qs.filter(estado_apadrinamiento_registro=estado)
-        padrino_id = request.query_params.get('padrino_id')
+        propio = _get_authenticated_padrino(request)
+        padrino_id = propio.pk if propio else request.query_params.get('padrino_id')
         if padrino_id:
             qs = qs.filter(id_padrino_id=padrino_id)
         serializer = ApadrinamientoSerializer(qs, many=True)
@@ -635,6 +653,9 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
             ap = Apadrinamiento.objects.select_related('id_padrino', 'id_nino').get(pk=pk)
         except Apadrinamiento.DoesNotExist:
             return Response({'error': 'Apadrinamiento no encontrado'}, status=status.HTTP_404_NOT_FOUND)
+        propio = _get_authenticated_padrino(request)
+        if propio and ap.id_padrino_id != propio.pk:
+            return _sin_permiso()
         serializer = ApadrinamientoSerializer(ap)
         return Response(serializer.data)
 
@@ -642,6 +663,9 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
     def create(self, request):
         """POST /api/apadrinamientos/ — crea el vínculo y actualiza estado del niño."""
         data = request.data
+        propio = _get_authenticated_padrino(request)
+        if propio and str(data.get('id_padrino', propio.pk)) != str(propio.pk):
+            return _sin_permiso()  # un padrino no puede apadrinar a nombre de otro
         try:
             padrino = Padrino.objects.get(pk=data['id_padrino'])
             nino    = Nino.objects.get(pk=data['id_nino'])
@@ -721,12 +745,22 @@ class ApadrinamientosViewSet(viewsets.ViewSet):
 # ENTREGAS
 # ──────────────────────────────────────────────────────────────────────────────
 
-class EntregasViewSet(viewsets.ViewSet):
+class EntregasViewSet(PermisosPorRolMixin, viewsets.ViewSet):
     """
     ViewSet para Entregas.
     Las observaciones se cifran con Fernet.
     Las evidencias (fotos) se guardan en MongoDB.
+    Un padrino solo ve/modifica entregas de SUS apadrinamientos.
     """
+    acciones_padrino = ('list', 'retrieve', 'detalle', 'create', 'partial_update', 'evidencia')
+
+    @staticmethod
+    def _es_ajena(request, entrega=None, apadrinamiento=None):
+        propio = _get_authenticated_padrino(request)
+        if propio is None:
+            return False
+        ap = apadrinamiento if apadrinamiento is not None else entrega.id_apadrinamiento
+        return ap.id_padrino_id != propio.pk
 
     def list(self, request):
         """GET /api/entregas/"""
@@ -737,6 +771,9 @@ class EntregasViewSet(viewsets.ViewSet):
         apadrinamiento_id = request.query_params.get('apadrinamiento_id')
         if apadrinamiento_id:
             qs = qs.filter(id_apadrinamiento_id=apadrinamiento_id)
+        propio = _get_authenticated_padrino(request)
+        if propio:
+            qs = qs.filter(id_apadrinamiento__id_padrino_id=propio.pk)
 
         # Pre-cargar evidencias de MongoDB en una sola consulta
         entrega_ids = [e.pk for e in qs]
@@ -753,9 +790,11 @@ class EntregasViewSet(viewsets.ViewSet):
     def retrieve(self, request, pk=None):
         """GET /api/entregas/{id}/ — datos básicos de MySQL."""
         try:
-            entrega = Entrega.objects.get(pk=pk)
+            entrega = Entrega.objects.select_related('id_apadrinamiento').get(pk=pk)
         except Entrega.DoesNotExist:
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        if self._es_ajena(request, entrega):
+            return _sin_permiso()
         serializer = EntregaSerializer(entrega)
         return Response(serializer.data)
 
@@ -774,6 +813,8 @@ class EntregasViewSet(viewsets.ViewSet):
             ).get(pk=pk)
         except Entrega.DoesNotExist:
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        if self._es_ajena(request, entrega):
+            return _sin_permiso()
 
         # Obtener evidencias de MongoDB
         try:
@@ -798,6 +839,8 @@ class EntregasViewSet(viewsets.ViewSet):
             return Response({'error': 'Punto de entrega no encontrado'}, status=status.HTTP_404_NOT_FOUND)
         except KeyError as e:
             return Response({'error': f'Campo requerido: {e}'}, status=status.HTTP_400_BAD_REQUEST)
+        if self._es_ajena(request, apadrinamiento=ap):
+            return _sin_permiso()
 
         observaciones = data.get('observaciones', '')
         entrega = Entrega(
@@ -823,9 +866,11 @@ class EntregasViewSet(viewsets.ViewSet):
     def partial_update(self, request, pk=None):
         """PATCH /api/entregas/{id}/"""
         try:
-            entrega = Entrega.objects.get(pk=pk)
+            entrega = Entrega.objects.select_related('id_apadrinamiento').get(pk=pk)
         except Entrega.DoesNotExist:
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        if self._es_ajena(request, entrega):
+            return _sin_permiso()
 
         data = request.data
         if 'estado_entrega' in data:
@@ -860,6 +905,8 @@ class EntregasViewSet(viewsets.ViewSet):
             ).get(pk=pk)
         except Entrega.DoesNotExist:
             return Response({'error': 'Entrega no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+        if self._es_ajena(request, entrega):
+            return _sin_permiso()
 
         archivo = request.FILES.get('foto') or request.FILES.get('archivo')
         if not archivo:
@@ -921,8 +968,9 @@ class EntregasViewSet(viewsets.ViewSet):
 # SOLICITUDES
 # ──────────────────────────────────────────────────────────────────────────────
 
-class SolicitudesViewSet(viewsets.ViewSet):
-    """ViewSet para Solicitudes de Regalo."""
+class SolicitudesViewSet(PermisosPorRolMixin, viewsets.ViewSet):
+    """ViewSet para Solicitudes de Regalo. Padrinos: solo lectura."""
+    acciones_padrino = ('list', 'retrieve')
 
     def list(self, request):
         qs = Solicitud.objects.select_related('id_nino', 'id_padrino_interesado').all()
@@ -1017,8 +1065,9 @@ class SolicitudesViewSet(viewsets.ViewSet):
 # PUNTOS DE ENTREGA
 # ──────────────────────────────────────────────────────────────────────────────
 
-class PuntosEntregaViewSet(viewsets.ViewSet):
-    """ViewSet para Puntos de Entrega."""
+class PuntosEntregaViewSet(PermisosPorRolMixin, viewsets.ViewSet):
+    """ViewSet para Puntos de Entrega. Padrinos: solo lectura."""
+    acciones_padrino = ('list', 'retrieve', 'cercanos')
 
     def list(self, request):
         qs = PuntoEntrega.objects.all().order_by('-id')
@@ -1072,7 +1121,7 @@ class PuntosEntregaViewSet(viewsets.ViewSet):
 # EVENTOS
 # ──────────────────────────────────────────────────────────────────────────────
 
-class EventosViewSet(viewsets.ViewSet):
+class EventosViewSet(PermisosPorRolMixin, viewsets.ViewSet):  # solo administradores
     """ViewSet para Eventos."""
 
     def list(self, request):
@@ -1121,7 +1170,7 @@ class EventosViewSet(viewsets.ViewSet):
 # ADMINISTRADORES
 # ──────────────────────────────────────────────────────────────────────────────
 
-class AdministradoresViewSet(viewsets.ViewSet):
+class AdministradoresViewSet(PermisosPorRolMixin, viewsets.ViewSet):  # solo administradores
     """ViewSet para Administradores."""
 
     def list(self, request):
@@ -1168,7 +1217,7 @@ class AdministradoresViewSet(viewsets.ViewSet):
 # DASHBOARD
 # ──────────────────────────────────────────────────────────────────────────────
 
-class DashboardViewSet(viewsets.ViewSet):
+class DashboardViewSet(PermisosPorRolMixin, viewsets.ViewSet):  # solo administradores
     """ViewSet para Dashboard KPIs — consulta MySQL directamente."""
 
     @action(detail=False, methods=['get'])
@@ -1447,10 +1496,11 @@ class DashboardViewSet(viewsets.ViewSet):
             return Response({'view': view, 'total': 0, 'items': [], '_error': str(e)})
 
 
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes
 from rest_framework.permissions import AllowAny
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([AllowAny])
 def diagnostics_check(request):
     """
