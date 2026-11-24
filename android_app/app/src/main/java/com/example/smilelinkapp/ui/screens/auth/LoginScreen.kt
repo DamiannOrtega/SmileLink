@@ -148,17 +148,6 @@ fun LoginScreen(
             TextButton(onClick = onNavigateToRegister) {
                 Text("¿No tienes cuenta? Regístrate")
             }
-            
-            Spacer(modifier = Modifier.height(32.dp))
-            
-            // Future: Google Sign-In button
-            OutlinedButton(
-                onClick = { /* TODO: Google Sign-In */ },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = false
-            ) {
-                Text("Continuar con Google (Próximamente)")
-            }
         }
     }
 }
